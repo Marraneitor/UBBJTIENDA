@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UBBJ Tienda — Catálogo</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#C9A84C">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="https://firebasestorage.googleapis.com/v0/b/ubbjtienda.firebasestorage.app/o/Logoubbj.png?alt=media">
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body data-page="catalogo">
+
+  <!-- ===== SPLASH SCREEN (Curtain Split) ===== -->
+  <div id="splash-screen" class="splash-screen">
+    <!-- Mitad izquierda -->
+    <div class="splash-half splash-left">
+      <div class="splash-content">
+        <img src="Logoubbj.png" alt="UBBJ" class="splash-logo">
+        <span class="splash-title">UBBJ Tienda Universitaria</span>
+        <span class="splash-sede">🏫 Sede Minatitlán</span>
+      </div>
+    </div>
+    <!-- Mitad derecha -->
+    <div class="splash-half splash-right">
+      <div class="splash-content">
+        <img src="Logoubbj.png" alt="UBBJ" class="splash-logo">
+        <span class="splash-title">UBBJ Tienda Universitaria</span>
+        <span class="splash-sede">🏫 Sede Minatitlán</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Spinner de carga -->
+  <div id="spinner-overlay" class="spinner-overlay">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- ===== NAVBAR ===== -->
+  <nav class="navbar">
+    <div class="container">
+      <a href="index.html" class="logo">
+        <img src="Logoubbj.png" alt="UBBJ"> UBBJ Tienda
+      </a>
+      <button id="menu-toggle" class="menu-toggle" aria-label="Menú">☰</button>
+      <ul id="nav-links" class="nav-links">
+        <li><a href="index.html" class="active">Catálogo</a></li>
+        <li><a href="vender.html">Vender</a></li>
+        <li><a href="perfilvendedor.html">Mi Panel (Vendedores)</a></li>
+        <li><a href="ubbjotito.html">Mi Ubbjotito</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- ===== HERO CON LOGO Y SEDE ===== -->
+  <header class="catalog-hero">
+    <img src="Logoubbj.png" alt="UBBJ Logo" class="hero-logo">
+    <h1>UBBJ Tienda Universitaria</h1>
+    <span class="hero-sede">📍 Sede Minatitlán</span>
+    <p>Encuentra vendedores verificados de la universidad. Haz clic en uno para ver sus productos.</p>
+  </header>
+
+  <!-- ===== BUSCADOR + FILTROS ===== -->
+  <div class="container">
+    <div class="search-bar">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="search-input" placeholder="Buscar vendedor, producto o categoría...">
+    </div>
+
+    <!-- Filtros por categoría -->
+    <div class="category-filters" id="category-filters">
+      <button class="cat-btn active" data-cat="todos">🎪 Todos</button>
+      <button class="cat-btn" data-cat="🍔 Comida">🍔 Comida</button>
+      <button class="cat-btn" data-cat="🥤 Bebidas">🥤 Bebidas</button>
+      <button class="cat-btn" data-cat="🍰 Postres">🍰 Postres</button>
+      <button class="cat-btn" data-cat="🍬 Snacks">🍬 Snacks</button>
+      <button class="cat-btn" data-cat="📚 Materiales">📚 Materiales</button>
+      <button class="cat-btn" data-cat="👕 Ropa">👕 Ropa</button>
+      <button class="cat-btn" data-cat="💻 Tecnología">💻 Tech</button>
+      <button class="cat-btn" data-cat="✏️ Servicios">✏️ Servicios</button>
+      <button class="cat-btn" data-cat="🎨 Otros">🎨 Otros</button>
+    </div>
+  </div>
+
+  <!-- ===== 🏆 RANKING DE VENDEDORES POPULARES ===== -->
+  <section class="container ranking-section" id="ranking-section" style="display:none">
+    <h2 class="ranking-title">🏆 Los más populares</h2>
+    <div id="ranking-grid" class="ranking-grid"></div>
+  </section>
+
+  <!-- ===== GRID DE VENDEDORES ===== -->
+  <main class="container">
+    <div id="sellers-grid" class="sellers-grid">
+      <!-- Las tarjetas se generan dinámicamente desde app.js -->
+    </div>
+  </main>
+
+  <!-- ===== BOTONES FLOTANTES (Cómo funciona + Quejas) ===== -->
+  <div class="fab-container">
+    <button id="btn-how" class="fab fab-info" title="¿Cómo funciona?">❓</button>
+    <button id="btn-complaint" class="fab fab-complaint" title="Reportar vendedor">⚠️</button>
+  </div>
+
+  <!-- ===== MODAL: CÓMO FUNCIONA ===== -->
+  <div id="how-modal" class="modal-overlay" style="display:none">
+    <div class="modal-box modal-how">
+      <button class="modal-close" onclick="document.getElementById('how-modal').style.display='none'">✕</button>
+      <h2>❓ ¿Cómo funciona UBBJ Tienda?</h2>
+      <div class="how-steps">
+        <div class="how-step">
+          <span class="how-step-num">1</span>
+          <div>
+            <strong>Explora el catálogo</strong>
+            <p>Navega por las tarjetas de vendedores verificados. Puedes usar el buscador para encontrar a alguien específico.</p>
+          </div>
+        </div>
+        <div class="how-step">
+          <span class="how-step-num">2</span>
+          <div>
+            <strong>Elige un vendedor</strong>
+            <p>Haz clic en la tarjeta del vendedor que te interese para ver todos sus productos disponibles.</p>
+          </div>
+        </div>
+        <div class="how-step">
+          <span class="how-step-num">3</span>
+          <div>
+            <strong>Agrega al carrito</strong>
+            <p>Selecciona los productos que quieras, elige la cantidad y agrégalos a tu carrito de compras.</p>
+          </div>
+        </div>
+        <div class="how-step">
+          <span class="how-step-num">4</span>
+          <div>
+            <strong>Elige cómo pagar</strong>
+            <p>Puedes pagar en efectivo (indica con cuánto pagas para calcular el cambio) o por transferencia bancaria si el vendedor lo tiene habilitado.</p>
+          </div>
+        </div>
+        <div class="how-step">
+          <span class="how-step-num">5</span>
+          <div>
+            <strong>Envía tu pedido por WhatsApp</strong>
+            <p>Al finalizar, se genera un mensaje automático con tu pedido y se envía directo al WhatsApp del vendedor para coordinar la entrega.</p>
+          </div>
+        </div>
+      </div>
+      <p style="margin-top:1rem;font-size:0.82rem;color:var(--text-secondary);text-align:center">¿Quieres vender? Regístrate en la sección <strong>"Vender"</strong> y espera la aprobación.</p>
+    </div>
+  </div>
+
+  <!-- ===== MODAL: REPORTAR VENDEDOR ===== -->
+  <div id="complaint-modal" class="modal-overlay" style="display:none">
+    <div class="modal-box">
+      <button class="modal-close" onclick="document.getElementById('complaint-modal').style.display='none'">✕</button>
+      <h2>⚠️ Reportar un vendedor</h2>
+      <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:1rem">Si tuviste un problema con un vendedor, cuéntanos. Tu reporte será revisado por el administrador.</p>
+      <form id="complaint-form" autocomplete="off">
+        <div class="form-group">
+          <label for="complaint-seller">Vendedor *</label>
+          <select id="complaint-seller" required>
+            <option value="">Selecciona un vendedor...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="complaint-subject">Asunto *</label>
+          <input type="text" id="complaint-subject" placeholder="Ej: No entregó el producto" required>
+        </div>
+        <div class="form-group">
+          <label for="complaint-message">Mensaje *</label>
+          <textarea id="complaint-message" placeholder="Describe lo que sucedió con el mayor detalle posible..." rows="4" required></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary form-submit">📩 Enviar reporte</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===== BOTTOM NAV (Mobile) ===== -->
+  <nav class="bottom-nav">
+    <div class="bottom-nav-inner">
+      <a href="index.html" class="bottom-nav-item active">
+        <span class="nav-icon">🏠</span>
+        <span>Inicio</span>
+      </a>
+      <a href="vender.html" class="bottom-nav-item">
+        <span class="nav-icon">🏷️</span>
+        <span>Vender</span>
+      </a>
+      <a href="perfilvendedor.html" class="bottom-nav-item">
+        <span class="nav-icon">👤</span>
+        <span>Vendedores</span>
+      </a>
+      <a href="ubbjotito.html" class="bottom-nav-item">
+        <span class="nav-icon">🐾</span>
+        <span>Ubbjotito</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="footer">
+    UBBJ Tienda Universitaria &copy; 2026 — Sede Minatitlán · Hecho con ❤️ por alumnos
+  </footer>
+
+  <!-- ===== FIREBASE SDKs (compat v9 CDN) ===== -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+
+  <!-- App -->
+  <script src="app.js"></script>
+</body>
+</html>

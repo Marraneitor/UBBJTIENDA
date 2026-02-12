@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UBBJ Tienda — Perfil de Vendedor</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#C9A84C">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="https://firebasestorage.googleapis.com/v0/b/ubbjtienda.firebasestorage.app/o/Logoubbj.png?alt=media">
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body data-page="perfil">
+
+  <!-- Spinner de carga -->
+  <div id="spinner-overlay" class="spinner-overlay">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- ===== NAVBAR ===== -->
+  <nav class="navbar">
+    <div class="container">
+      <a href="index.html" class="logo">
+        <img src="Logoubbj.png" alt="UBBJ"> UBBJ Tienda
+      </a>
+      <button id="menu-toggle" class="menu-toggle" aria-label="Menú">☰</button>
+      <ul id="nav-links" class="nav-links">
+        <li><a href="index.html">Catálogo</a></li>
+        <li><a href="vender.html">Vender</a></li>
+        <li><a href="perfilvendedor.html">Mi Panel (Vendedores)</a></li>
+        <li><a href="ubbjotito.html">Mi Ubbjotito</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- ===== PROFILE HEADER ===== -->
+  <header class="profile-header">
+    <img id="profile-avatar" class="profile-avatar" src="https://placehold.co/110/e2e8f0/64748b?text=👤" alt="Avatar">
+    <h1 id="profile-name" class="profile-name">Cargando...</h1>
+    <p id="profile-career" class="profile-career"></p>
+    <p id="profile-bio" class="profile-bio"></p>
+
+    <!-- Sistema de calificación -->
+    <div id="rating-container" class="rating-container">
+      <!-- Se genera dinámicamente -->
+    </div>
+
+    <a id="profile-wa-btn" href="#" target="_blank" rel="noopener" class="btn btn-whatsapp profile-wa-btn" style="display:none">
+      💬 Contactar por WhatsApp
+    </a>
+  </header>
+
+  <!-- ===== PRODUCTOS DEL VENDEDOR ===== -->
+  <main class="container">
+    <h2 style="font-size:1.15rem;font-weight:700;margin-bottom:1rem;">📦 Productos</h2>
+    <div id="product-grid" class="product-grid">
+      <!-- Se generan dinámicamente -->
+    </div>
+  </main>
+
+  <!-- ===== 💬 CHAT FLOTANTE TIPO MESSENGER ===== -->
+  <div id="chat-fab" class="chat-fab" style="display:none;">
+    <button id="chat-fab-btn" class="chat-fab-btn">
+      💬
+      <span id="chat-fab-badge" class="chat-fab-badge" style="display:none;">0</span>
+    </button>
+  </div>
+
+  <div id="chat-popup" class="chat-popup" style="display:none;">
+    <div class="chat-popup-header">
+      <div class="chat-popup-avatar">💬</div>
+      <span id="chat-popup-name" class="chat-popup-name">Chat con el vendedor</span>
+      <button id="chat-popup-close" class="chat-popup-close">✕</button>
+    </div>
+    <div id="buyer-chat-messages" class="chat-popup-messages"></div>
+    <div class="chat-popup-input">
+      <input type="text" id="buyer-chat-input" placeholder="Escribe un mensaje..." autocomplete="off">
+      <button id="buyer-chat-send" class="chat-popup-send">➤</button>
+    </div>
+  </div>
+
+  <!-- ===== CARRITO FLOTANTE ===== -->
+  <div id="cart-float" class="cart-float hidden">
+    <button id="cart-toggle" class="cart-toggle-btn">
+      🛒 <span id="cart-count">0</span>
+    </button>
+  </div>
+
+  <div id="cart-panel" class="cart-panel">
+    <div class="cart-panel-header">
+      <h3>🛒 Tu pedido</h3>
+      <button id="cart-close" class="cart-close-btn">✕</button>
+    </div>
+    <ul id="cart-items" class="cart-items"></ul>
+    <div class="cart-summary">
+      <div class="cart-total-row">
+        <span>Total:</span>
+        <strong id="cart-total">$0.00</strong>
+      </div>
+
+      <!-- Método de pago -->
+      <div class="cart-payment-method">
+        <label style="font-weight:600;font-size:0.85rem;margin-bottom:0.5rem;display:block">💳 Método de pago</label>
+        <div class="payment-options">
+          <label class="payment-option">
+            <input type="radio" name="payment-method" value="efectivo" checked>
+            <span class="payment-label">💵 Efectivo</span>
+          </label>
+          <label class="payment-option" id="transfer-option" style="display:none">
+            <input type="radio" name="payment-method" value="transferencia">
+            <span class="payment-label">🏦 Transferencia</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Efectivo: pago y cambio -->
+      <div id="cash-fields">
+        <div class="cart-pay-row">
+          <label for="cart-pay-amount">Pago con:</label>
+          <input type="number" id="cart-pay-amount" min="0" step="0.01" placeholder="$0.00">
+        </div>
+        <div class="cart-change-row">
+          <span>Cambio:</span>
+          <strong id="cart-change">$0.00</strong>
+        </div>
+      </div>
+
+      <!-- Transferencia: datos bancarios -->
+      <div id="transfer-info" class="transfer-info-box" style="display:none">
+        <p class="transfer-msg">💳 Pagaré por transferencia</p>
+        <div class="transfer-detail">
+          <span class="transfer-label">Número de cuenta:</span>
+          <div class="transfer-copyable">
+            <span id="ti-account">—</span>
+            <button class="copy-btn" onclick="copyText('ti-account')">Copiar</button>
+          </div>
+        </div>
+        <div class="transfer-detail">
+          <span class="transfer-label">A nombre de:</span>
+          <div class="transfer-copyable">
+            <span id="ti-holder">—</span>
+            <button class="copy-btn" onclick="copyText('ti-holder')">Copiar</button>
+          </div>
+        </div>
+        <div class="transfer-detail">
+          <span class="transfer-label">Banco:</span>
+          <div class="transfer-copyable">
+            <span id="ti-bank">—</span>
+            <button class="copy-btn" onclick="copyText('ti-bank')">Copiar</button>
+          </div>
+        </div>
+        <p class="transfer-note">⚠️ Favor de enviar la captura de la transferencia al vendedor por WhatsApp.</p>
+      </div>
+    </div>
+    <button id="cart-send-wa" class="btn btn-whatsapp cart-send-btn">
+      💬 Enviar pedido por WhatsApp
+    </button>
+  </div>
+  <div id="cart-overlay" class="cart-overlay"></div>
+
+  <!-- ===== BOTTOM NAV (Mobile) ===== -->
+  <nav class="bottom-nav">
+    <div class="bottom-nav-inner">
+      <a href="index.html" class="bottom-nav-item">
+        <span class="nav-icon">🏠</span>
+        <span>Inicio</span>
+      </a>
+      <a href="vender.html" class="bottom-nav-item">
+        <span class="nav-icon">🏷️</span>
+        <span>Vender</span>
+      </a>
+      <a href="perfilvendedor.html" class="bottom-nav-item">
+        <span class="nav-icon">👤</span>
+        <span>Vendedores</span>
+      </a>
+      <a href="ubbjotito.html" class="bottom-nav-item">
+        <span class="nav-icon">🐾</span>
+        <span>Ubbjotito</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="footer">
+    UBBJ Tienda Universitaria &copy; 2026 — Sede Minatitlán · Hecho con ❤️ por alumnos
+  </footer>
+
+  <!-- ===== FIREBASE SDKs ===== -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+
+  <!-- Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+
+  <!-- App -->
+  <script src="app.js"></script>
+</body>
+</html>

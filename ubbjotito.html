@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UBBJ Tienda — Mi Ubbjotito</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#C9A84C">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="https://firebasestorage.googleapis.com/v0/b/ubbjtienda.firebasestorage.app/o/Logoubbj.png?alt=media">
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body data-page="ubbjotito">
+
+  <!-- Spinner de carga -->
+  <div id="spinner-overlay" class="spinner-overlay">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- ===== LOGIN/REGISTER OVERLAY ===== -->
+  <div id="buyer-auth-overlay" class="login-overlay">
+    <div class="login-box buyer-auth-box" style="position:relative">
+      <a href="index.html" class="buyer-close-btn" title="Cerrar">✕</a>
+      <!-- Tabs -->
+      <div class="buyer-auth-tabs">
+        <button class="buyer-tab active" data-tab="login">Iniciar sesión</button>
+        <button class="buyer-tab" data-tab="register">Registrarse</button>
+      </div>
+
+      <!-- LOGIN FORM -->
+      <div id="buyer-login-form" class="buyer-auth-form">
+        <h2>🐾 Mi Ubbjotito</h2>
+        <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:1rem">Ingresa con tu número y contraseña.</p>
+        <div class="form-group">
+          <label for="buyer-login-phone">Número de teléfono</label>
+          <input type="tel" id="buyer-login-phone" placeholder="Ej: 9221593688">
+        </div>
+        <div class="form-group">
+          <label for="buyer-login-pass">Contraseña</label>
+          <input type="password" id="buyer-login-pass" placeholder="Tu contraseña">
+        </div>
+        <button id="buyer-login-btn" class="btn btn-primary" style="width:100%">Entrar</button>
+      </div>
+
+      <!-- REGISTER FORM -->
+      <div id="buyer-register-form" class="buyer-auth-form" style="display:none">
+        <h2>🐾 Crear tu Ubbjotito</h2>
+        <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:1rem">Regístrate para tener tu perfil de comprador.</p>
+        <form id="buyer-reg-form" autocomplete="off">
+          <div class="form-group">
+            <label for="buyer-reg-name">Tu nombre *</label>
+            <input type="text" id="buyer-reg-name" placeholder="Ej: Juan Pérez" required>
+          </div>
+          <div class="form-group">
+            <label for="buyer-reg-group">Tu grupo *</label>
+            <input type="text" id="buyer-reg-group" placeholder="Ej: 4A, 2B, 6C..." required>
+          </div>
+          <div class="form-group">
+            <label for="buyer-reg-phone">Número de teléfono *</label>
+            <div class="phone-wrapper">
+              <select id="buyer-reg-code">
+                <option value="52" selected>🇲🇽 +52</option>
+                <option value="1">🇺🇸 +1</option>
+              </select>
+              <input type="tel" id="buyer-reg-phone" placeholder="9221593688" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="buyer-reg-pass">Contraseña *</label>
+            <input type="password" id="buyer-reg-pass" placeholder="Mínimo 4 caracteres" minlength="4" required>
+          </div>
+          <div class="form-group">
+            <label for="buyer-reg-pass2">Confirmar contraseña *</label>
+            <input type="password" id="buyer-reg-pass2" placeholder="Repite tu contraseña" minlength="4" required>
+          </div>
+
+          <!-- Políticas de uso -->
+          <div class="form-group">
+            <label>📋 Políticas de uso</label>
+            <div class="policies-box" id="buyer-policies-box">
+              <h4 style="margin:0 0 0.5rem;font-size:0.95rem;">Términos y Condiciones de UBBJ Tienda</h4>
+              <p>Al registrarte como comprador en UBBJ Tienda Universitaria, aceptas cumplir con las siguientes políticas:</p>
+              <ol>
+                <li><strong>Uso responsable:</strong> La plataforma es exclusiva para la comunidad universitaria UBBJ. Úsala de forma responsable y respetuosa.</li>
+                <li><strong>Respeto:</strong> Se espera un trato respetuoso y cordial con todos los vendedores y demás miembros de la comunidad universitaria.</li>
+                <li><strong>Honestidad:</strong> No realices pedidos falsos ni acuerdes compras que no planees concretar.</li>
+                <li><strong>No fraude:</strong> Está prohibido enviar comprobantes de pago falsos o realizar cualquier práctica fraudulenta.</li>
+                <li><strong>Cuenta personal:</strong> Tu cuenta es personal e intransferible. No compartas tu contraseña con terceros.</li>
+                <li><strong>Calificaciones honestas:</strong> Las calificaciones a vendedores deben reflejar tu experiencia real. No se permiten calificaciones malintencionadas.</li>
+                <li><strong>Sanciones:</strong> El incumplimiento de cualquiera de estas políticas resultará en la suspensión o eliminación permanente de tu cuenta sin previo aviso.</li>
+              </ol>
+              <p style="margin-top:0.5rem;font-weight:600;">UBBJ Tienda se reserva el derecho de eliminar cuentas que no cumplan con estas normas.</p>
+            </div>
+            <label class="policies-check">
+              <input type="checkbox" id="buyer-accept-policies" required>
+              <span>He leído y acepto las <strong>Políticas de Uso</strong> de UBBJ Tienda</span>
+            </label>
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width:100%">📩 Crear cuenta</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== NAVBAR ===== -->
+  <nav class="navbar">
+    <div class="container">
+      <a href="index.html" class="logo">
+        <img src="Logoubbj.png" alt="UBBJ"> UBBJ Tienda
+      </a>
+      <button id="menu-toggle" class="menu-toggle" aria-label="Menú">☰</button>
+      <ul id="nav-links" class="nav-links">
+        <li><a href="index.html">Catálogo</a></li>
+        <li><a href="vender.html">Vender</a></li>
+        <li><a href="perfilvendedor.html">Mi Panel (Vendedores)</a></li>
+        <li><a href="ubbjotito.html" class="active">Mi Ubbjotito</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- ===== PERFIL DEL COMPRADOR ===== -->
+  <div id="buyer-profile-section" style="display:none">
+
+    <!-- Profile Header -->
+    <header class="profile-header buyer-profile-header">
+      <div class="buyer-avatar-wrapper">
+        <img id="buyer-avatar" class="profile-avatar" src="https://placehold.co/110/e2e8f0/64748b?text=🐾" alt="Avatar">
+        <label class="buyer-avatar-edit" for="buyer-photo-input" title="Cambiar foto">📷</label>
+        <input type="file" id="buyer-photo-input" accept="image/*" style="display:none">
+      </div>
+      <h1 id="buyer-name" class="profile-name">Cargando...</h1>
+      <p class="profile-career">📚 Ingeniería y Administración de la Industria Energética</p>
+      <p id="buyer-group" class="profile-bio" style="display:block"></p>
+      <button id="buyer-logout-btn" class="btn btn-outline" style="margin-top:0.75rem;font-size:0.8rem;padding:0.4rem 1.2rem;border-color:rgba(255,255,255,0.5);color:#fff">
+        🚪 Cerrar sesión
+      </button>
+    </header>
+
+    <!-- Contenido principal -->
+    <main class="container">
+
+      <!-- Editar perfil -->
+      <section class="admin-section">
+        <h2>✏️ Editar perfil</h2>
+        <div class="form-section" style="padding:1rem 1.25rem">
+          <div class="form-group">
+            <label for="buyer-edit-name">Nombre</label>
+            <input type="text" id="buyer-edit-name" placeholder="Tu nombre">
+          </div>
+          <div class="form-group">
+            <label for="buyer-edit-group">Grupo</label>
+            <input type="text" id="buyer-edit-group" placeholder="Ej: 4A">
+          </div>
+          <button id="buyer-save-profile" class="btn btn-primary btn-sm">💾 Guardar cambios</button>
+        </div>
+      </section>
+
+      <!-- Mis conversaciones -->
+      <section class="admin-section">
+        <h2>💬 Mis conversaciones</h2>
+        <div id="buyer-chats-list" class="buyer-chats-list">
+          <p style="color:var(--text-secondary);font-size:0.85rem">Cargando...</p>
+        </div>
+      </section>
+
+      <!-- Historial de compras -->
+      <section class="admin-section">
+        <h2>🛒 Historial de compras</h2>
+        <ul id="buyer-purchase-list" class="pending-list">
+          <li style="color:var(--text-secondary)">Cargando...</li>
+        </ul>
+      </section>
+
+    </main>
+
+    <!-- Chat popup para conversaciones del comprador -->
+    <div id="buyer-conv-popup" class="chat-popup buyer-conv-popup" style="display:none;">
+      <div class="chat-popup-header">
+        <div class="chat-popup-avatar">💬</div>
+        <span id="buyer-conv-popup-name" class="chat-popup-name">Chat</span>
+        <div class="chat-popup-header-actions">
+          <button id="buyer-conv-popup-close" class="chat-popup-close">✕</button>
+        </div>
+      </div>
+      <div id="buyer-conv-messages" class="chat-popup-messages"></div>
+      <div class="chat-popup-input">
+        <input type="text" id="buyer-conv-input" placeholder="Escribe un mensaje..." autocomplete="off">
+        <button id="buyer-conv-send" class="chat-popup-send">➤</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== BOTTOM NAV (Mobile) ===== -->
+  <nav class="bottom-nav">
+    <div class="bottom-nav-inner">
+      <a href="index.html" class="bottom-nav-item">
+        <span class="nav-icon">🏠</span>
+        <span>Inicio</span>
+      </a>
+      <a href="vender.html" class="bottom-nav-item">
+        <span class="nav-icon">🏷️</span>
+        <span>Vender</span>
+      </a>
+      <a href="perfilvendedor.html" class="bottom-nav-item">
+        <span class="nav-icon">👤</span>
+        <span>Vendedores</span>
+      </a>
+      <a href="ubbjotito.html" class="bottom-nav-item active">
+        <span class="nav-icon">🐾</span>
+        <span>Ubbjotito</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="footer">
+    UBBJ Tienda Universitaria &copy; 2026 — Sede Minatitlán · Hecho con ❤️ por alumnos
+  </footer>
+
+  <!-- ===== FIREBASE SDKs ===== -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+
+  <!-- App -->
+  <script src="app.js"></script>
+</body>
+</html>

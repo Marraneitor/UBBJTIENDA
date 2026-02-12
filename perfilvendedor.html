@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UBBJ Tienda — Panel del Vendedor</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#C9A84C">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="https://firebasestorage.googleapis.com/v0/b/ubbjtienda.firebasestorage.app/o/Logoubbj.png?alt=media">
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body data-page="perfilvendedor">
+
+  <!-- Spinner de carga -->
+  <div id="spinner-overlay" class="spinner-overlay">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- ===== LOGIN OVERLAY ===== -->
+  <div id="vendor-login-overlay" class="login-overlay">
+    <div class="login-box">
+      <h2>🔑 Panel del Vendedor</h2>
+      <p>Ingresa tu número de WhatsApp y la contraseña que creaste al registrarte.</p>
+      <div class="form-group" style="margin-bottom:0.75rem">
+        <label for="vendor-phone" style="font-weight:600;font-size:0.85rem;margin-bottom:0.25rem;display:block">Número de WhatsApp</label>
+        <input type="tel" id="vendor-phone" placeholder="Ej: 5212345678">
+      </div>
+      <div class="form-group" style="margin-bottom:0.75rem">
+        <label for="vendor-pass" style="font-weight:600;font-size:0.85rem;margin-bottom:0.25rem;display:block">Contraseña</label>
+        <input type="password" id="vendor-pass" placeholder="Contraseña">
+      </div>
+      <button id="vendor-login-btn" class="btn btn-primary" style="width:100%">Entrar</button>
+    </div>
+  </div>
+
+  <!-- ===== NAVBAR ===== -->
+  <nav class="navbar">
+    <div class="container">
+      <a href="index.html" class="logo">
+        <img src="Logoubbj.png" alt="UBBJ"> UBBJ Tienda
+      </a>
+      <button id="menu-toggle" class="menu-toggle" aria-label="Menú">☰</button>
+      <ul id="nav-links" class="nav-links">
+        <li><a href="index.html">Catálogo</a></li>
+        <li><a href="vender.html">Vender</a></li>
+        <li><a href="perfilvendedor.html" class="active">Mi Panel (Vendedores)</a></li>
+        <li><a href="ubbjotito.html">Mi Ubbjotito</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- ===== PROFILE HEADER ===== -->
+  <header class="profile-header">
+    <div class="avatar-edit-wrapper">
+      <img id="vp-avatar" class="profile-avatar" src="https://placehold.co/110/e2e8f0/64748b?text=👤" alt="Avatar">
+      <label for="vp-photo-input" class="avatar-edit-btn" title="Cambiar foto">📷</label>
+      <input type="file" id="vp-photo-input" accept="image/*" style="display:none">
+    </div>
+    <h1 id="vp-name" class="profile-name">Cargando...</h1>
+    <p id="vp-career" class="profile-career"></p>
+
+    <!-- Descripción editable -->
+    <div class="vendor-bio-section">
+      <textarea id="vp-bio" class="vendor-bio-input" placeholder="Describe qué tipo de cosas vendes... Ej: Comida casera, libros usados, electrónica" maxlength="200"></textarea>
+      <button id="vp-save-bio" class="btn btn-primary btn-sm">💾 Guardar descripción</button>
+    </div>
+
+    <button id="vp-logout-btn" class="btn btn-outline-sm" style="margin-top:0.75rem">🚪 Cerrar sesión</button>
+  </header>
+
+  <!-- ===== SUB-MENÚ DE PESTAÑAS ===== -->
+  <div class="panel-tabs-wrapper">
+    <nav class="panel-tabs">
+      <button class="panel-tab active" data-tab="tab-productos">📦 Productos</button>
+      <button class="panel-tab" data-tab="tab-pedidos">
+        📋 Pedidos <span id="tab-pedidos-badge" class="tab-badge" style="display:none">0</span>
+      </button>
+      <button class="panel-tab" data-tab="tab-estadisticas">📊 Estadísticas</button>
+      <button class="panel-tab" data-tab="tab-config">⚙️ Ajustes</button>
+    </nav>
+  </div>
+
+  <!-- ========================================= -->
+  <!-- TAB: PRODUCTOS                            -->
+  <!-- ========================================= -->
+  <div id="tab-productos" class="panel-tab-content active">
+
+    <!-- Añadir producto -->
+    <div class="container">
+      <div class="add-product-section">
+        <button id="toggle-add-product" class="btn btn-primary add-product-toggle">➕ Añadir Producto</button>
+
+        <div id="add-product-form" class="add-product-form">
+          <h3>Nuevo producto</h3>
+          <form id="product-form" autocomplete="off">
+            <div class="form-group">
+              <label for="nombre">Nombre del artículo *</label>
+              <input type="text" id="nombre" name="nombre" placeholder="Ej: Calculadora científica" required>
+            </div>
+            <div class="form-group">
+              <label for="precio">Precio (MXN) *</label>
+              <input type="number" id="precio" name="precio" min="1" step="0.01" placeholder="150.00" required>
+            </div>
+            <div class="form-group">
+              <label for="prod-categoria">Categoría del producto *</label>
+              <select id="prod-categoria" name="prod-categoria" required>
+                <option value="">Selecciona una categoría...</option>
+                <option value="🍔 Comida">🍔 Comida</option>
+                <option value="🥤 Bebidas">🥤 Bebidas</option>
+                <option value="🍰 Postres">🍰 Postres</option>
+                <option value="🍬 Snacks">🍬 Snacks</option>
+                <option value="📚 Materiales">📚 Materiales</option>
+                <option value="👕 Ropa">👕 Ropa</option>
+                <option value="💻 Tecnología">💻 Tecnología</option>
+                <option value="✏️ Servicios">✏️ Servicios</option>
+                <option value="🎨 Otros">🎨 Otros</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="descripcion">Descripción (opcional)</label>
+              <textarea id="descripcion" name="descripcion" placeholder="Condición, detalles, accesorios..."></textarea>
+            </div>
+            <div class="form-group">
+              <label for="lugar">Lugar de entrega *</label>
+              <input type="text" id="lugar" name="lugar" placeholder="Ej: Cafetería, Edificio B" required>
+            </div>
+            <div class="form-group">
+              <label>Foto del producto</label>
+              <div class="file-input-wrapper">
+                <input type="file" id="product-image" accept="image/*">
+                <div class="upload-text">
+                  <div class="upload-icon">📷</div>
+                  <strong>Haz clic</strong> o arrastra una imagen aquí
+                </div>
+              </div>
+              <img id="product-img-preview" class="img-preview" alt="Vista previa">
+            </div>
+            <button type="submit" class="btn btn-primary form-submit">🚀 Publicar producto</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mis productos -->
+    <main class="container">
+      <h2 style="font-size:1.15rem;font-weight:700;margin-bottom:1rem;">📦 Mis Productos</h2>
+      <div id="my-product-grid" class="product-grid">
+        <!-- Se generan dinámicamente -->
+      </div>
+    </main>
+
+  </div><!-- /tab-productos -->
+
+  <!-- ========================================= -->
+  <!-- TAB: PEDIDOS                              -->
+  <!-- ========================================= -->
+  <div id="tab-pedidos" class="panel-tab-content">
+
+    <div class="container">
+      <div class="vendor-orders-section">
+        <h3>📋 Pedidos pendientes <span id="orders-pending-badge" class="unread-badge" style="display:none">0</span></h3>
+        <div id="vendor-orders-list" class="vendor-orders-list">
+          <p class="empty-orders-msg">No tienes pedidos pendientes 🎉</p>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /tab-pedidos -->
+
+  <!-- ========================================= -->
+  <!-- TAB: ESTADÍSTICAS                         -->
+  <!-- ========================================= -->
+  <div id="tab-estadisticas" class="panel-tab-content">
+
+    <div class="container">
+      <div class="vendor-stats-section">
+        <h3>📊 Mis Estadísticas</h3>
+        <div class="stats-cards-row">
+          <div class="stat-mini-card">
+            <span class="stat-mini-icon">👁️</span>
+            <span class="stat-mini-value" id="stat-visits">0</span>
+            <span class="stat-mini-label">Visitas</span>
+          </div>
+          <div class="stat-mini-card">
+            <span class="stat-mini-icon">🛒</span>
+            <span class="stat-mini-value" id="stat-orders">0</span>
+            <span class="stat-mini-label">Pedidos</span>
+          </div>
+          <div class="stat-mini-card">
+            <span class="stat-mini-icon">⭐</span>
+            <span class="stat-mini-value" id="stat-rating">0</span>
+            <span class="stat-mini-label">Calificación</span>
+          </div>
+          <div class="stat-mini-card">
+            <span class="stat-mini-icon">💰</span>
+            <span class="stat-mini-value" id="stat-revenue">$0</span>
+            <span class="stat-mini-label">Ingresos</span>
+          </div>
+        </div>
+        <div class="stats-chart-container">
+          <h4 style="font-size:0.85rem;font-weight:600;margin-bottom:0.5rem;">📈 Visitas últimos 7 días</h4>
+          <canvas id="visits-chart" height="180"></canvas>
+        </div>
+        <div class="stats-chart-container" style="margin-top:1rem;">
+          <h4 style="font-size:0.85rem;font-weight:600;margin-bottom:0.5rem;">⭐ Calificaciones recibidas</h4>
+          <canvas id="ratings-chart" height="180"></canvas>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /tab-estadisticas -->
+
+  <!-- ========================================= -->
+  <!-- TAB: CONFIGURACIÓN                        -->
+  <!-- ========================================= -->
+  <div id="tab-config" class="panel-tab-content">
+
+    <!-- Configuración del perfil -->
+    <div class="container">
+      <div class="vendor-config-section">
+        <h3>⚙️ Configuración de mi perfil</h3>
+
+        <div class="config-row">
+          <div class="config-info">
+            <span class="config-label">◆ Fuera de servicio</span>
+            <span class="config-hint">Tu perfil aparecerá como "Fuera de servicio" en el catálogo</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="vp-hide-profile">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="config-row">
+          <div class="config-info">
+            <span class="config-label">🕒 Horario disponible</span>
+            <span class="config-hint">Se mostrará en tu tarjeta del catálogo</span>
+          </div>
+          <div class="schedule-inputs">
+            <div class="schedule-row">
+              <label for="vp-hora-inicio" style="font-size:0.8rem;font-weight:600">De:</label>
+              <input type="time" id="vp-hora-inicio" class="config-time">
+            </div>
+            <div class="schedule-row">
+              <label for="vp-hora-fin" style="font-size:0.8rem;font-weight:600">A:</label>
+              <input type="time" id="vp-hora-fin" class="config-time">
+            </div>
+          </div>
+        </div>
+
+        <div class="config-row">
+          <div class="config-info">
+            <span class="config-label">🕒 Turno</span>
+            <span class="config-hint">Se mostrará en tu tarjeta del catálogo</span>
+          </div>
+          <select id="vp-turno" class="config-select">
+            <option value="">Sin turno</option>
+            <option value="matutino">🌅 Matutino</option>
+            <option value="vespertino">🌇 Vespertino</option>
+            <option value="ambos">🌄 Ambos</option>
+          </select>
+        </div>
+
+        <button id="vp-save-config" class="btn btn-primary btn-sm" style="margin-top:0.75rem">💾 Guardar configuración</button>
+      </div>
+    </div>
+
+    <!-- QR del perfil -->
+    <div class="container">
+      <div id="vendor-qr-section" class="profile-qr-section" style="background:rgba(255,255,255,0.04);border-radius:var(--radius);padding:1.25rem;border:1px solid rgba(255,255,255,0.08);margin-bottom:1.5rem;">
+        <p class="qr-label" style="font-size:0.95rem;font-weight:700;margin-bottom:0.5rem;">📱 Código QR de tu perfil</p>
+        <p style="font-size:0.78rem;color:rgba(255,255,255,0.55);margin-bottom:0.75rem;">Imprímelo y ponlo en tu mesa o local para que te encuentren rápido</p>
+        <div id="profile-qr" class="qr-canvas"></div>
+        <button id="download-qr" class="btn btn-outline btn-sm qr-download-btn" style="margin-top:0.75rem;">📥 Descargar QR</button>
+      </div>
+    </div>
+
+    <!-- Pago por transferencia -->
+    <div class="container">
+      <div class="transfer-config-section">
+        <h3>🏦 Pago por transferencia</h3>
+        <p class="transfer-config-desc">Habilita esta opción para que tus clientes puedan pagarte por transferencia bancaria.</p>
+        <div class="toggle-row">
+          <label class="switch">
+            <input type="checkbox" id="vp-transfer-toggle">
+            <span class="slider"></span>
+          </label>
+          <span id="vp-transfer-status">Deshabilitado</span>
+        </div>
+        <div id="vp-transfer-fields" class="transfer-fields" style="display:none">
+          <div class="form-group">
+            <label for="vp-bank-name">🏦 Banco *</label>
+            <input type="text" id="vp-bank-name" placeholder="Ej: BBVA, Banamex, Banorte">
+          </div>
+          <div class="form-group">
+            <label for="vp-bank-account">💳 Número de cuenta / CLABE *</label>
+          <input type="text" id="vp-bank-account" placeholder="Ej: 012345678901234567">
+        </div>
+        <div class="form-group">
+          <label for="vp-bank-holder">👤 Nombre del titular *</label>
+          <input type="text" id="vp-bank-holder" placeholder="Nombre completo del titular">
+        </div>
+        <button id="vp-save-transfer" class="btn btn-primary btn-sm">💾 Guardar datos bancarios</button>
+      </div>
+    </div>
+  </div>
+
+  </div><!-- /tab-config -->
+
+  <!-- ===== MODAL EDITAR PRODUCTO (overlay, fuera de tabs) ===== -->
+  <div id="edit-product-modal" class="modal-overlay" style="display:none">
+    <div class="modal-box" style="max-width:480px;width:92%;max-height:90vh;overflow-y:auto;">
+      <h3 style="margin-bottom:1rem;">✏️ Editar Producto</h3>
+      <form id="edit-product-form" autocomplete="off">
+        <input type="hidden" id="edit-prod-id">
+        <div class="form-group">
+          <label for="edit-prod-nombre">Nombre *</label>
+          <input type="text" id="edit-prod-nombre" required>
+        </div>
+        <div class="form-group">
+          <label for="edit-prod-precio">Precio (MXN) *</label>
+          <input type="number" id="edit-prod-precio" min="1" step="0.01" required>
+        </div>
+        <div class="form-group">
+          <label for="edit-prod-categoria">Categoría *</label>
+          <select id="edit-prod-categoria" required>
+            <option value="">Selecciona...</option>
+            <option value="🍔 Comida">🍔 Comida</option>
+            <option value="🥤 Bebidas">🥤 Bebidas</option>
+            <option value="🍰 Postres">🍰 Postres</option>
+            <option value="🍬 Snacks">🍬 Snacks</option>
+            <option value="📚 Materiales">📚 Materiales</option>
+            <option value="👕 Ropa">👕 Ropa</option>
+            <option value="💻 Tecnología">💻 Tecnología</option>
+            <option value="✏️ Servicios">✏️ Servicios</option>
+            <option value="🎨 Otros">🎨 Otros</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="edit-prod-descripcion">Descripción</label>
+          <textarea id="edit-prod-descripcion" placeholder="Detalles del producto..."></textarea>
+        </div>
+        <div class="form-group">
+          <label for="edit-prod-lugar">Lugar de entrega *</label>
+          <input type="text" id="edit-prod-lugar" required>
+        </div>
+        <div class="form-group">
+          <label>Cambiar imagen (opcional)</label>
+          <div class="file-input-wrapper">
+            <input type="file" id="edit-prod-image" accept="image/*">
+            <div class="upload-text">
+              <div class="upload-icon">📷</div>
+              <strong>Haz clic</strong> o arrastra una imagen
+            </div>
+          </div>
+          <img id="edit-prod-preview" class="img-preview" alt="Vista previa" style="display:none;margin-top:0.5rem;">
+        </div>
+        <div style="display:flex;gap:0.5rem;">
+          <button type="submit" class="btn btn-primary form-submit" style="flex:1;">💾 Guardar cambios</button>
+          <button type="button" class="btn btn-danger" style="flex:0.5;" onclick="document.getElementById('edit-product-modal').style.display='none'">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===== 💬 CHATS FLOTANTES TIPO MESSENGER ===== -->
+  <div id="vendor-chat-heads" class="chat-heads-container"></div>
+
+  <!-- ===== CHAT POPUP VENDEDOR ===== -->
+  <div id="vendor-chat-popup" class="chat-popup vendor-chat-popup" style="display:none;">
+    <div class="chat-popup-header">
+      <div class="chat-popup-avatar">💬</div>
+      <span id="vendor-chat-popup-name" class="chat-popup-name">Chat</span>
+      <div class="chat-popup-header-actions">
+        <button id="vendor-chat-minimize" class="chat-popup-minimize">▬</button>
+        <button id="vendor-chat-popup-close" class="chat-popup-close">✕</button>
+      </div>
+    </div>
+    <div id="vendor-chat-messages" class="chat-popup-messages"></div>
+    <div class="chat-popup-input">
+      <input type="text" id="vendor-chat-input" placeholder="Escribe un mensaje..." autocomplete="off">
+      <button id="vendor-chat-send" class="chat-popup-send">➤</button>
+    </div>
+  </div>
+
+  <!-- ===== BOTTOM NAV (Mobile) ===== -->
+  <nav class="bottom-nav">
+    <div class="bottom-nav-inner">
+      <a href="index.html" class="bottom-nav-item">
+        <span class="nav-icon">🏠</span>
+        <span>Inicio</span>
+      </a>
+      <a href="vender.html" class="bottom-nav-item">
+        <span class="nav-icon">🏷️</span>
+        <span>Vender</span>
+      </a>
+      <a href="perfilvendedor.html" class="bottom-nav-item active">
+        <span class="nav-icon">👤</span>
+        <span>Vendedores</span>
+      </a>
+      <a href="ubbjotito.html" class="bottom-nav-item">
+        <span class="nav-icon">🐾</span>
+        <span>Ubbjotito</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="footer">
+    UBBJ Tienda Universitaria &copy; 2026 — Sede Minatitlán · Hecho con ❤️ por alumnos
+  </footer>
+
+  <!-- ===== FIREBASE SDKs ===== -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+
+  <!-- QR library -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <!-- App -->
+  <script src="app.js"></script>
+</body>
+</html>

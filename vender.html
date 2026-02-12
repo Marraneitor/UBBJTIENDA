@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UBBJ Tienda — Vender</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#C9A84C">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="https://firebasestorage.googleapis.com/v0/b/ubbjtienda.firebasestorage.app/o/Logoubbj.png?alt=media">
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body data-page="vender">
+
+  <!-- Spinner de carga -->
+  <div id="spinner-overlay" class="spinner-overlay">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- ===== NAVBAR ===== -->
+  <nav class="navbar">
+    <div class="container">
+      <a href="index.html" class="logo">
+        <img src="Logoubbj.png" alt="UBBJ"> UBBJ Tienda
+      </a>
+      <button id="menu-toggle" class="menu-toggle" aria-label="Menú">☰</button>
+      <ul id="nav-links" class="nav-links">
+        <li><a href="index.html">Catálogo</a></li>
+        <li><a href="vender.html" class="active">Vender</a></li>
+        <li><a href="perfilvendedor.html">Mi Panel (Vendedores)</a></li>
+        <li><a href="ubbjotito.html">Mi Ubbjotito</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- ===== HEADER ===== -->
+  <header class="page-header">
+    <h1>Regístrate como vendedor</h1>
+    <p>Crea tu perfil y espera la aprobación del admin para comenzar a publicar tus productos.</p>
+  </header>
+
+  <!-- ===== FORMULARIO DE REGISTRO ===== -->
+  <main class="container">
+    <section class="form-section">
+      <form id="register-form" autocomplete="off">
+
+        <!-- Nombre -->
+        <div class="form-group">
+          <label for="nombre">Tu nombre completo *</label>
+          <input type="text" id="nombre" name="nombre" placeholder="Ej: María López" required>
+        </div>
+
+        <!-- Categoría -->
+        <div class="form-group">
+          <label for="categoria">Categoría de lo que vendes *</label>
+          <select id="categoria" name="categoria" required>
+            <option value="">Selecciona una categoría...</option>
+            <option value="🍔 Comida">🍔 Comida</option>
+            <option value="🥤 Bebidas">🥤 Bebidas</option>
+            <option value="🍰 Postres">🍰 Postres</option>
+            <option value="🍬 Snacks">🍬 Snacks</option>
+            <option value="📚 Materiales">📚 Materiales</option>
+            <option value="👕 Ropa">👕 Ropa</option>
+            <option value="💻 Tecnología">💻 Tecnología</option>
+            <option value="✏️ Servicios">✏️ Servicios</option>
+            <option value="🎨 Otros">🎨 Otros</option>
+          </select>
+        </div>
+
+        <!-- Teléfono WhatsApp -->
+        <div class="form-group">
+          <label for="telefono">WhatsApp (con lada) *</label>
+          <div class="phone-wrapper">
+            <select name="codigoPais" id="codigoPais">
+              <option value="52" selected>🇲🇽 +52</option>
+              <option value="1">🇺🇸 +1</option>
+              <option value="57">🇨🇴 +57</option>
+              <option value="54">🇦🇷 +54</option>
+              <option value="56">🇨🇱 +56</option>
+              <option value="51">🇵🇪 +51</option>
+              <option value="34">🇪🇸 +34</option>
+            </select>
+            <input type="tel" id="telefono" name="telefono" placeholder="55 1234 5678" required>
+          </div>
+        </div>
+
+        <!-- Contraseña -->
+        <div class="form-group">
+          <label for="password">Contraseña para tu panel *</label>
+          <input type="password" id="password" name="password" placeholder="Mínimo 4 caracteres" minlength="4" required>
+          <small style="color:var(--text-secondary);font-size:0.78rem;">Esta contraseña la usarás para acceder a "Mi Panel" y gestionar tus productos.</small>
+        </div>
+
+        <!-- Confirmar contraseña -->
+        <div class="form-group">
+          <label for="password-confirm">Confirmar contraseña *</label>
+          <input type="password" id="password-confirm" name="passwordConfirm" placeholder="Repite tu contraseña" minlength="4" required>
+        </div>
+
+        <!-- Foto de perfil -->
+        <div class="form-group">
+          <label>Foto de perfil</label>
+          <div class="file-input-wrapper">
+            <input type="file" id="profile-photo" accept="image/*">
+            <div class="upload-text">
+              <div class="upload-icon">📷</div>
+              <strong>Haz clic</strong> o arrastra tu foto aquí
+            </div>
+          </div>
+          <img id="img-preview" class="img-preview" alt="Vista previa">
+        </div>
+
+        <!-- Políticas de uso -->
+        <div class="form-group">
+          <label>📋 Políticas de uso</label>
+          <div class="policies-box" id="policies-box">
+            <h4 style="margin:0 0 0.5rem;font-size:0.95rem;">Términos y Condiciones de UBBJ Tienda</h4>
+            <p>Al registrarte como vendedor en UBBJ Tienda Universitaria, aceptas cumplir con las siguientes políticas:</p>
+            <ol>
+              <li><strong>Productos legítimos:</strong> Solo se permite la venta de productos legales y lícitos. Queda estrictamente prohibida la venta de sustancias ilegales, armas, material robado, falsificaciones o cualquier artículo que viole las leyes mexicanas.</li>
+              <li><strong>Honestidad:</strong> Toda la información de tus productos (descripción, precio, fotos y condición) debe ser veraz y precisa. No se toleran engaños ni publicidad falsa.</li>
+              <li><strong>No estafas:</strong> Está prohibido cobrar por productos que no se entregarán, alterar precios después de un acuerdo de compra o cualquier práctica fraudulenta.</li>
+              <li><strong>No robo:</strong> No se permite la venta de objetos robados o de procedencia dudosa. El vendedor debe ser legítimo propietario de todo lo que publique.</li>
+              <li><strong>Respeto:</strong> Se espera un trato respetuoso y cordial con todos los compradores y demás miembros de la comunidad universitaria.</li>
+              <li><strong>Responsabilidad:</strong> Cada vendedor es responsable de cumplir con los acuerdos de venta, entregar los productos en las condiciones prometidas y en el lugar acordado.</li>
+              <li><strong>Cuenta personal:</strong> Tu cuenta es personal e intransferible. No compartas tu contraseña con terceros.</li>
+              <li><strong>Sanciones:</strong> El incumplimiento de cualquiera de estas políticas resultará en la suspensión o eliminación permanente de tu perfil de vendedor sin previo aviso.</li>
+            </ol>
+            <p style="margin-top:0.5rem;font-weight:600;">UBBJ Tienda se reserva el derecho de eliminar publicaciones o vendedores que no cumplan con estas normas.</p>
+          </div>
+          <label class="policies-check">
+            <input type="checkbox" id="accept-policies" required>
+            <span>He leído y acepto las <strong>Políticas de Uso</strong> de UBBJ Tienda</span>
+          </label>
+        </div>
+
+        <!-- Submit -->
+        <button type="submit" class="btn btn-primary form-submit">
+          📩 Enviar solicitud
+        </button>
+      </form>
+    </section>
+  </main>
+
+  <!-- ===== BOTTOM NAV (Mobile) ===== -->
+  <nav class="bottom-nav">
+    <div class="bottom-nav-inner">
+      <a href="index.html" class="bottom-nav-item">
+        <span class="nav-icon">🏠</span>
+        <span>Inicio</span>
+      </a>
+      <a href="vender.html" class="bottom-nav-item active">
+        <span class="nav-icon">🏷️</span>
+        <span>Vender</span>
+      </a>
+      <a href="perfilvendedor.html" class="bottom-nav-item">
+        <span class="nav-icon">👤</span>
+        <span>Vendedores</span>
+      </a>
+      <a href="ubbjotito.html" class="bottom-nav-item">
+        <span class="nav-icon">🐾</span>
+        <span>Ubbjotito</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="footer">
+    UBBJ Tienda Universitaria &copy; 2026 — Sede Minatitlán · Hecho con ❤️ por alumnos
+  </footer>
+
+  <!-- ===== FIREBASE SDKs ===== -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+
+  <!-- App -->
+  <script src="app.js"></script>
+</body>
+</html>
