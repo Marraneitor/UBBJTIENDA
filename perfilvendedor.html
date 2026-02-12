@@ -29,7 +29,8 @@
 
   <!-- ===== LOGIN OVERLAY ===== -->
   <div id="vendor-login-overlay" class="login-overlay">
-    <div class="login-box">
+    <div class="login-box" style="position:relative">
+      <a href="index.html" class="buyer-close-btn" title="Cerrar">✕</a>
       <h2>🔑 Panel del Vendedor</h2>
       <p>Ingresa tu número de WhatsApp y la contraseña que creaste al registrarte.</p>
       <div class="form-group" style="margin-bottom:0.75rem">
@@ -41,6 +42,10 @@
         <input type="password" id="vendor-pass" placeholder="Contraseña">
       </div>
       <button id="vendor-login-btn" class="btn btn-primary" style="width:100%">Entrar</button>
+      <p style="margin-top:1rem;font-size:0.82rem;color:var(--text-secondary);text-align:center">
+        Este panel es para vendedores registrados.<br>
+        ¿Deseas vender? <a href="vender.html" style="color:var(--accent);font-weight:700;text-decoration:underline">Regístrate aquí</a>
+      </p>
     </div>
   </div>
 
