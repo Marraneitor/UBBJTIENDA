@@ -179,6 +179,17 @@
           <p class="empty-orders-msg">No tienes pedidos pendientes 🎉</p>
         </div>
       </div>
+
+      <!-- Historial de pedidos (entregados/cancelados) -->
+      <div class="vendor-orders-section" style="margin-top:1.5rem;">
+        <button id="toggle-history-btn" class="order-history-toggle">
+          📁 Historial de pedidos <span id="history-count-badge" class="history-count">0</span>
+          <span id="history-arrow" class="history-arrow">▼</span>
+        </button>
+        <div id="vendor-orders-history" class="vendor-orders-list" style="display:none;margin-top:0.75rem;">
+          <p class="empty-orders-msg">No hay pedidos en el historial</p>
+        </div>
+      </div>
     </div>
 
   </div><!-- /tab-pedidos -->
@@ -430,6 +441,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
 
   <!-- QR library -->
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>

@@ -32,6 +32,153 @@ const metricsDoc       = db.doc("metricas/global");
 
 
 // =============================================
+// 🔔 SISTEMA DE NOTIFICACIONES PUSH (FCM)
+// =============================================
+// VAPID Key pública de Firebase Cloud Messaging
+// Obtenla en Firebase Console → Configuración → Cloud Messaging → Web Push certificates
+const VAPID_KEY = 'BPCXfdMPKtjFiHgSUfNfD0jgb4onpFeJ9VHOUlaTh02sGGGe4lZxOEqqOLz2Embr8TR-hkW6NXiLzcnMdYJtdYk';
+
+let _messagingInstance = null;
+
+function getMessagingInstance() {
+  if (_messagingInstance) return _messagingInstance;
+  try {
+    _messagingInstance = firebase.messaging();
+    return _messagingInstance;
+  } catch (err) {
+    console.warn('FCM no disponible:', err.message);
+    return null;
+  }
+}
+
+/** Pedir permiso de notificaciones y obtener token FCM */
+async function requestNotificationPermission() {
+  if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+    console.log('Notificaciones no soportadas en este navegador');
+    return null;
+  }
+
+  const permission = await Notification.requestPermission();
+  if (permission !== 'granted') {
+    console.log('Permiso de notificaciones denegado');
+    return null;
+  }
+
+  try {
+    const swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+    const messaging = getMessagingInstance();
+    if (!messaging) return null;
+
+    const token = await messaging.getToken({
+      vapidKey: VAPID_KEY,
+      serviceWorkerRegistration: swReg
+    });
+
+    if (token) {
+      console.log('✅ Token FCM obtenido');
+      localStorage.setItem('fcmToken', token);
+      return token;
+    }
+  } catch (err) {
+    console.error('Error obteniendo token FCM:', err);
+  }
+  return null;
+}
+
+/** Guardar token del comprador vinculado a un pedido */
+async function saveClientNotifToken(compradorId, compradorNombre, compradorTelefono) {
+  const token = await requestNotificationPermission();
+  if (!token || !compradorId) return null;
+
+  try {
+    await db.collection('notifTokens').doc(token).set({
+      token,
+      tipo: 'comprador',
+      compradorId,
+      nombre: compradorNombre || 'Cliente',
+      telefono: compradorTelefono || '',
+      actualizadoEn: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  } catch (err) {
+    console.error('Error guardando token de comprador:', err);
+  }
+  return token;
+}
+
+/** Guardar token del vendedor para recibir notif de nuevos pedidos */
+async function saveSellerNotifToken(sellerId) {
+  const token = await requestNotificationPermission();
+  if (!token || !sellerId) return null;
+
+  try {
+    await db.collection('notifTokens').doc(token).set({
+      token,
+      tipo: 'vendedor',
+      vendedorId: sellerId,
+      actualizadoEn: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  } catch (err) {
+    console.error('Error guardando token de vendedor:', err);
+  }
+  return token;
+}
+
+/** Escuchar notificaciones en primer plano */
+function listenForegroundNotifications() {
+  try {
+    const messaging = getMessagingInstance();
+    if (!messaging) return;
+
+    messaging.onMessage((payload) => {
+      const title = payload.notification?.title || '🔔 UBBJ Tienda';
+      const body = payload.notification?.body || '';
+
+      // Notificación nativa del navegador
+      if (Notification.permission === 'granted') {
+        const n = new Notification(title, {
+          body,
+          icon: '/Logoubbj.png',
+          vibrate: [200, 100, 200]
+        });
+        n.onclick = () => { window.focus(); n.close(); };
+      }
+
+      // Toast visual en la app
+      showNotificationToast(title, body);
+    });
+  } catch (err) {
+    console.warn('Error listener foreground:', err);
+  }
+}
+
+/** Toast de notificación visible en la app */
+function showNotificationToast(title, body) {
+  const prev = document.getElementById('notif-toast');
+  if (prev) prev.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'notif-toast';
+  toast.className = 'notification-toast';
+  toast.innerHTML = `
+    <div class="notif-toast-icon">🔔</div>
+    <div class="notif-toast-content">
+      <strong>${title}</strong>
+      <p>${body}</p>
+    </div>
+    <button class="notif-toast-close" onclick="this.parentElement.remove()">✕</button>
+  `;
+  document.body.appendChild(toast);
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+  setTimeout(() => { if (toast.parentElement) toast.remove(); }, 6000);
+}
+
+// Iniciar listener al cargar
+if ('serviceWorker' in navigator) {
+  listenForegroundNotifications();
+}
+
+
+// =============================================
 // 🛠️  UTILIDADES
 // =============================================
 
@@ -854,10 +1001,25 @@ function setupCart(seller) {
   });
 
   if (sendBtn) {
-    sendBtn.addEventListener("click", () => {
+    sendBtn.addEventListener("click", async () => {
       if (cart.length === 0) {
         showToast("Agrega productos al carrito primero", "error");
         return;
+      }
+
+      // Get buyer info for the message
+      let buyerDisplayName = "";
+      let buyerDisplayGroup = "";
+      const buyerId = sessionStorage.getItem("buyer_id");
+      if (buyerId) {
+        try {
+          const bDoc = await buyersCol.doc(buyerId).get();
+          if (bDoc.exists) {
+            const bd = bDoc.data();
+            buyerDisplayName = bd.nombre || "";
+            buyerDisplayGroup = bd.grupo || "";
+          }
+        } catch(e) {}
       }
 
       const totalPrice = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
@@ -866,6 +1028,8 @@ function setupCart(seller) {
 
       let msg = `🛒 *Nuevo pedido desde UBBJ Tienda*\n\n`;
       msg += `Hola ${seller.nombre}, quiero pedir:\n\n`;
+      if (buyerDisplayName) msg += `👤 *Cliente:* ${buyerDisplayName}\n`;
+      if (buyerDisplayGroup) msg += `📋 *Grupo:* ${buyerDisplayGroup}\n\n`;
       cart.forEach(item => {
         msg += `• ${item.qty}x ${item.name} — ${formatPrice(item.price * item.qty)}\n`;
       });
@@ -1111,6 +1275,47 @@ async function loadVendorPanel(sellerId) {
     loadVendorStats(sellerId);
     setupVendorChat(sellerId);
     loadVendorOrders(sellerId);
+
+    // Ofrecer activar notificaciones al vendedor
+    if (!localStorage.getItem('sellerNotifEnabled') && 'Notification' in window) {
+      setTimeout(() => {
+        const banner = document.createElement('div');
+        banner.id = 'seller-notif-banner';
+        banner.innerHTML = `
+          <div style="position:fixed;top:80px;left:50%;transform:translateX(-50%);
+            background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;
+            padding:14px 20px;border-radius:14px;z-index:9999;display:flex;
+            align-items:center;gap:12px;box-shadow:0 6px 25px rgba(0,0,0,0.2);
+            font-family:'Poppins',sans-serif;max-width:90%;width:400px;
+            animation:slideDown .4s ease">
+            <span style="font-size:1.5rem">🔔</span>
+            <div style="flex:1">
+              <strong style="font-size:0.85rem">Activar notificaciones</strong>
+              <p style="font-size:0.7rem;margin:2px 0 0;opacity:0.9">
+                Recibe alertas cuando te hagan un pedido nuevo
+              </p>
+            </div>
+            <button id="enable-seller-notif" style="background:#fff;color:#16a34a;border:none;
+              padding:8px 14px;border-radius:10px;font-weight:700;cursor:pointer;
+              font-size:0.8rem">Activar</button>
+            <button id="dismiss-seller-notif" style="background:none;border:none;color:#fff;
+              font-size:1.2rem;cursor:pointer">✕</button>
+          </div>
+        `;
+        document.body.appendChild(banner);
+
+        document.getElementById('enable-seller-notif').addEventListener('click', async () => {
+          banner.remove();
+          await saveSellerNotifToken(sellerId);
+          localStorage.setItem('sellerNotifEnabled', 'true');
+          showToast('🔔 Notificaciones activadas — recibirás alertas de nuevos pedidos', 'success');
+        });
+
+        document.getElementById('dismiss-seller-notif').addEventListener('click', () => {
+          banner.remove();
+        });
+      }, 2000);
+    }
 
     // ===== SUB-MENÚ DE PESTAÑAS =====
     const panelTabs = document.querySelectorAll('.panel-tab');
@@ -2213,8 +2418,25 @@ async function savePurchase(seller, cartItems, totalPrice, paymentMethod) {
     const vendorSnap = await sellersCol.where("telefono", "==", seller.telefono).limit(1).get();
     const vendorId = vendorSnap.empty ? "" : vendorSnap.docs[0].id;
 
+    // Obtener datos del comprador para guardarlos en el pedido
+    let compradorNombre = "Comprador";
+    let compradorGrupo = "";
+    let compradorTelefono = "";
+    try {
+      const buyerDoc = await buyersCol.doc(buyerId).get();
+      if (buyerDoc.exists) {
+        const bd = buyerDoc.data();
+        compradorNombre = bd.nombre || "Comprador";
+        compradorGrupo = bd.grupo || "";
+        compradorTelefono = bd.telefono || "";
+      }
+    } catch(e) { console.warn("No se pudo obtener datos del comprador", e); }
+
     await purchasesCol.add({
       compradorId: buyerId,
+      compradorNombre,
+      compradorGrupo,
+      compradorTelefono,
       vendedorId: vendorId,
       vendedorTelefono: seller.telefono || "",
       vendedorNombre: seller.nombre || "Vendedor",
@@ -2228,6 +2450,20 @@ async function savePurchase(seller, cartItems, totalPrice, paymentMethod) {
     // Efecto confetti al enviar pedido
     if (typeof confetti === "function") {
       confetti({ particleCount: 120, spread: 80, origin: { y: 0.7 } });
+    }
+
+    // Preguntar si quiere recibir notificaciones push
+    if (!localStorage.getItem('fcmToken') && 'Notification' in window) {
+      setTimeout(async () => {
+        const wantsNotif = confirm(
+          '🔔 ¿Quieres recibir notificaciones cuando tu pedido esté listo?\n\n' +
+          'Te avisaremos al instante en tu celular.'
+        );
+        if (wantsNotif) {
+          await saveClientNotifToken(buyerId, compradorNombre, compradorTelefono);
+          showToast('🔔 Notificaciones activadas', 'success');
+        }
+      }, 1500);
     }
 
   } catch (err) {
@@ -2250,11 +2486,15 @@ async function loadVendorStats(sellerId) {
 
     const pedidosSnap = await purchasesCol
       .where('vendedorId', '==', sellerId).get();
-    const totalOrders = pedidosSnap.size;
-    setText('stat-orders', totalOrders.toString());
-
+    let totalOrders = 0;
     let totalRevenue = 0;
-    pedidosSnap.forEach(doc => { totalRevenue += doc.data().total || 0; });
+    pedidosSnap.forEach(doc => {
+      const d = doc.data();
+      const estado = d.estado || 'pendiente';
+      if (estado !== 'cancelado') totalOrders++;
+      if (estado === 'entregado') totalRevenue += d.total || 0;
+    });
+    setText('stat-orders', totalOrders.toString());
     setText('stat-revenue', formatPrice(totalRevenue));
 
     const ratingSnap = await ratingsCol
@@ -2605,17 +2845,34 @@ function openVendorChatModal() {}
 
 async function loadVendorOrders(sellerId) {
   const ordersList = document.getElementById('vendor-orders-list');
+  const historyList = document.getElementById('vendor-orders-history');
   const badge = document.getElementById('orders-pending-badge');
+  const historyBadge = document.getElementById('history-count-badge');
+  const historyToggle = document.getElementById('toggle-history-btn');
+  const historyArrow = document.getElementById('history-arrow');
   if (!ordersList) return;
+
+  // Toggle history visibility
+  if (historyToggle && historyList) {
+    historyToggle.addEventListener('click', () => {
+      const isHidden = historyList.style.display === 'none';
+      historyList.style.display = isHidden ? 'flex' : 'none';
+      if (historyArrow) historyArrow.textContent = isHidden ? '\u25b2' : '\u25bc';
+    });
+  }
 
   purchasesCol.where('vendedorId', '==', sellerId)
     .onSnapshot(async (snap) => {
       ordersList.innerHTML = '';
+      if (historyList) historyList.innerHTML = '';
       let pendingCount = 0;
+      let historyCount = 0;
 
       if (snap.empty) {
         ordersList.innerHTML = '<p class="empty-orders-msg">No tienes pedidos pendientes \ud83c\udf89</p>';
+        if (historyList) historyList.innerHTML = '<p class="empty-orders-msg">No hay pedidos en el historial</p>';
         if (badge) badge.style.display = 'none';
+        if (historyBadge) historyBadge.textContent = '0';
         return;
       }
 
@@ -2629,14 +2886,23 @@ async function loadVendorOrders(sellerId) {
       for (const doc of docs) {
         const order = doc.data();
         const estado = order.estado || 'pendiente';
-        if (estado === 'pendiente') pendingCount++;
+        const isPending = estado === 'pendiente';
+        if (isPending) pendingCount++;
+        else historyCount++;
 
-        // Get buyer name
-        let buyerName = 'Comprador';
-        if (order.compradorId) {
+        // Get buyer info — prefer stored data, fallback to fetching
+        let buyerName = order.compradorNombre || 'Comprador';
+        let buyerGroup = order.compradorGrupo || '';
+        let buyerPhone = order.compradorTelefono || '';
+        if (!order.compradorNombre && order.compradorId) {
           try {
             const bDoc = await buyersCol.doc(order.compradorId).get();
-            if (bDoc.exists) buyerName = bDoc.data().nombre || 'Comprador';
+            if (bDoc.exists) {
+              const bd = bDoc.data();
+              buyerName = bd.nombre || 'Comprador';
+              buyerGroup = bd.grupo || '';
+              buyerPhone = bd.telefono || '';
+            }
           } catch(e) {}
         }
 
@@ -2658,24 +2924,35 @@ async function loadVendorOrders(sellerId) {
           });
         }
 
-        const payIcon = order.metodoPago === 'transferencia' ? '\ud83c\udfe6' : '\ud83d\udcb5';
+        const payIcon = order.metodoPago === 'transferencia' ? '🏦' : '💵';
+        const statusLabel = estado === 'pendiente' ? '⏳ PENDIENTE' : estado === 'entregado' ? '✅ ENTREGADO' : '❌ CANCELADO';
+
+        // Build buyer info line
+        let buyerInfoHtml = '';
+        if (buyerGroup) buyerInfoHtml += '<span class="order-buyer-detail">📋 ' + buyerGroup + '</span>';
+        if (buyerPhone) buyerInfoHtml += '<span class="order-buyer-detail">📱 ' + buyerPhone + '</span>';
 
         card.innerHTML =
           '<div class="order-header">' +
-            '<span class="order-buyer">\ud83d\udc64 ' + buyerName + '</span>' +
+            '<div class="order-buyer-info">' +
+              '<span class="order-buyer">👤 ' + buyerName + '</span>' +
+              (buyerInfoHtml ? '<div class="order-buyer-details">' + buyerInfoHtml + '</div>' : '') +
+            '</div>' +
             '<span class="order-date">' + dateStr + '</span>' +
           '</div>' +
           '<ul class="order-items">' + itemsHtml + '</ul>' +
           '<div class="order-footer">' +
             '<span class="order-total">' + payIcon + ' ' + formatPrice(order.total || 0) + '</span>' +
-            '<span class="order-status-badge ' + estado + '">' +
-              (estado === 'pendiente' ? '\u23f3 Pendiente' : '\u2705 Entregado') +
-            '</span>' +
+            '<span class="order-status-badge ' + estado + '">' + statusLabel + '</span>' +
           '</div>' +
-          (estado === 'pendiente' ?
+          (isPending ?
             '<div class="order-actions">' +
-              '<button class="order-btn order-btn-complete" data-id="' + doc.id + '">\u2705 Marcar entregado</button>' +
-              '<button class="order-btn order-btn-cancel" data-id="' + doc.id + '">\u274c Cancelar</button>' +
+              '<button class="order-btn order-btn-complete" data-id="' + doc.id + '">✅ Marcar entregado</button>' +
+              '<button class="order-btn order-btn-cancel" data-id="' + doc.id + '">❌ Cancelar</button>' +
+            '</div>' : '') +
+          (buyerPhone ?
+            '<div class="order-actions">' +
+              '<a class="order-btn order-btn-contact" href="https://wa.me/' + buyerPhone + '?text=' + encodeURIComponent('Hola ' + buyerName + ', sobre tu pedido en UBBJ Tienda...') + '" target="_blank" rel="noopener">💬 Contactar cliente</a>' +
             '</div>' : '');
 
         // Add event listeners for buttons
@@ -2692,13 +2969,29 @@ async function loadVendorOrders(sellerId) {
           });
         });
 
-        ordersList.appendChild(card);
+        // Append to the right list
+        if (isPending) {
+          ordersList.appendChild(card);
+        } else if (historyList) {
+          historyList.appendChild(card);
+        }
       }
 
-      // Update badge
+      // Show empty messages if needed
+      if (pendingCount === 0) {
+        ordersList.innerHTML = '<p class="empty-orders-msg">No tienes pedidos pendientes \ud83c\udf89</p>';
+      }
+      if (historyCount === 0 && historyList) {
+        historyList.innerHTML = '<p class="empty-orders-msg">No hay pedidos en el historial</p>';
+      }
+
+      // Update badges
       if (badge) {
         badge.textContent = pendingCount;
         badge.style.display = pendingCount > 0 ? 'inline-flex' : 'none';
+      }
+      if (historyBadge) {
+        historyBadge.textContent = historyCount;
       }
     });
 }

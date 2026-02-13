@@ -13,5 +13,9 @@ desktop.ini
 *.swp
 *.swo
 
+# Node
+node_modules/
+functions/node_modules/
+
 # Misc
 *.txt
