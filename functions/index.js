@@ -4,9 +4,41 @@ admin.initializeApp();
 
 const db = admin.firestore();
 
+// Helper para enviar notificaciones y limpiar tokens inválidos
+async function sendPushNotification(tokensSnap, title, body) {
+  const tokens = tokensSnap.docs.map(doc => doc.data().token).filter(Boolean);
+  if (tokens.length === 0) return;
+
+  console.log(`📨 Enviando notificación a ${tokens.length} dispositivo(s)`);
+
+  const response = await admin.messaging().sendEachForMulticast({
+    notification: { title, body },
+    webpush: {
+      notification: {
+        icon: 'https://ubbjtienda.vercel.app/Logoubbj.png',
+        badge: 'https://ubbjtienda.vercel.app/Logoubbj.png',
+        vibrate: [200, 100, 200]
+      }
+    },
+    tokens
+  });
+
+  console.log(`✅ Enviadas: ${response.successCount}/${tokens.length}`);
+
+  // Limpiar tokens inválidos
+  const batch = db.batch();
+  let cleaned = 0;
+  response.responses.forEach((resp, i) => {
+    if (!resp.success) {
+      const tokenDoc = tokensSnap.docs.find(d => d.data().token === tokens[i]);
+      if (tokenDoc) { batch.delete(tokenDoc.ref); cleaned++; }
+    }
+  });
+  if (cleaned > 0) await batch.commit();
+}
+
 // =============================================
 // 🔔 NOTIFICAR AL CLIENTE cuando su pedido cambia de estado
-// Se dispara cuando se actualiza un doc en la colección "compras"
 // =============================================
 exports.notifyClientOnOrderUpdate = functions.firestore
   .document('compras/{purchaseId}')
@@ -14,7 +46,6 @@ exports.notifyClientOnOrderUpdate = functions.firestore
     const before = change.before.data();
     const after = change.after.data();
 
-    // Solo notificar si cambió el estado
     if (before.estado === after.estado) return null;
 
     let title, body;
@@ -28,7 +59,6 @@ exports.notifyClientOnOrderUpdate = functions.firestore
       return null;
     }
 
-    // Buscar tokens del comprador
     const compradorId = after.compradorId || '';
     if (!compradorId) return null;
 
@@ -37,98 +67,82 @@ exports.notifyClientOnOrderUpdate = functions.firestore
       .where('compradorId', '==', compradorId)
       .get();
 
-    if (tokensSnap.empty) {
-      console.log('No hay tokens para el comprador:', compradorId);
-      return null;
-    }
-
-    const tokens = tokensSnap.docs.map(doc => doc.data().token).filter(Boolean);
-    if (tokens.length === 0) return null;
-
-    console.log(`📨 Enviando notificación a ${tokens.length} dispositivo(s) del comprador`);
-
-    const response = await admin.messaging().sendEachForMulticast({
-      notification: { title, body },
-      webpush: {
-        notification: {
-          icon: 'https://ubbjtienda.vercel.app/Logoubbj.png',
-          badge: 'https://ubbjtienda.vercel.app/Logoubbj.png',
-          vibrate: [200, 100, 200, 100, 200]
-        }
-      },
-      tokens
-    });
-
-    console.log(`✅ Enviadas: ${response.successCount}/${tokens.length}`);
-
-    // Limpiar tokens inválidos
-    const batch = db.batch();
-    response.responses.forEach((resp, i) => {
-      if (!resp.success) {
-        const tokenDoc = tokensSnap.docs.find(d => d.data().token === tokens[i]);
-        if (tokenDoc) batch.delete(tokenDoc.ref);
-      }
-    });
-    await batch.commit();
-
+    if (tokensSnap.empty) return null;
+    await sendPushNotification(tokensSnap, title, body);
     return null;
   });
 
 // =============================================
 // 🔔 NOTIFICAR AL VENDEDOR cuando recibe un pedido nuevo
-// Se dispara cuando se crea un doc en "compras"
 // =============================================
 exports.notifySellerOnNewOrder = functions.firestore
   .document('compras/{purchaseId}')
   .onCreate(async (snap, context) => {
     const order = snap.data();
     const vendedorId = order.vendedorId || '';
-
     if (!vendedorId) return null;
 
     const items = (order.productos || []).map(i => `${i.qty}x ${i.name}`).join(', ');
     const title = '🛒 ¡Nuevo pedido!';
     const body = `${order.compradorNombre || 'Un cliente'} pidió: ${items} — $${order.total || 0}`;
 
-    // Buscar tokens del vendedor
     const tokensSnap = await db.collection('notifTokens')
       .where('tipo', '==', 'vendedor')
       .where('vendedorId', '==', vendedorId)
       .get();
 
-    if (tokensSnap.empty) {
-      console.log('No hay tokens para el vendedor:', vendedorId);
+    if (tokensSnap.empty) return null;
+    await sendPushNotification(tokensSnap, title, body);
+    return null;
+  });
+
+// =============================================
+// 💬 NOTIFICAR cuando alguien envía un MENSAJE en el chat
+// =============================================
+exports.notifyOnNewMessage = functions.firestore
+  .document('mensajes/{messageId}')
+  .onCreate(async (snap, context) => {
+    const msg = snap.data();
+    const from = msg.from; // 'comprador' o 'vendedor'
+    const texto = msg.texto || '';
+
+    if (!from || !texto) return null;
+
+    let targetType, targetId, senderName;
+
+    if (from === 'comprador') {
+      // Comprador envió → notificar al vendedor
+      targetType = 'vendedor';
+      targetId = msg.vendedorId || '';
+      try {
+        const buyerDoc = await db.collection('compradores').doc(msg.compradorId || '').get();
+        senderName = buyerDoc.exists ? buyerDoc.data().nombre : 'Un cliente';
+      } catch(e) { senderName = 'Un cliente'; }
+    } else if (from === 'vendedor') {
+      // Vendedor envió → notificar al comprador
+      targetType = 'comprador';
+      targetId = msg.compradorId || '';
+      try {
+        const sellerDoc = await db.collection('vendedores').doc(msg.vendedorId || '').get();
+        senderName = sellerDoc.exists ? sellerDoc.data().nombre : 'Un vendedor';
+      } catch(e) { senderName = 'Un vendedor'; }
+    } else {
       return null;
     }
 
-    const tokens = tokensSnap.docs.map(doc => doc.data().token).filter(Boolean);
-    if (tokens.length === 0) return null;
+    if (!targetId) return null;
 
-    console.log(`📨 Enviando notificación a ${tokens.length} dispositivo(s) del vendedor`);
+    const tokenField = targetType === 'vendedor' ? 'vendedorId' : 'compradorId';
+    const tokensSnap = await db.collection('notifTokens')
+      .where('tipo', '==', targetType)
+      .where(tokenField, '==', targetId)
+      .get();
 
-    const response = await admin.messaging().sendEachForMulticast({
-      notification: { title, body },
-      webpush: {
-        notification: {
-          icon: 'https://ubbjtienda.vercel.app/Logoubbj.png',
-          badge: 'https://ubbjtienda.vercel.app/Logoubbj.png',
-          vibrate: [200, 100, 200, 100, 200]
-        }
-      },
-      tokens
-    });
+    if (tokensSnap.empty) return null;
 
-    console.log(`✅ Enviadas: ${response.successCount}/${tokens.length}`);
+    const title = `💬 Mensaje de ${senderName}`;
+    const body = texto.length > 100 ? texto.substring(0, 100) + '...' : texto;
 
-    // Limpiar tokens inválidos
-    const batch = db.batch();
-    response.responses.forEach((resp, i) => {
-      if (!resp.success) {
-        const tokenDoc = tokensSnap.docs.find(d => d.data().token === tokens[i]);
-        if (tokenDoc) batch.delete(tokenDoc.ref);
-      }
-    });
-    await batch.commit();
-
+    await sendPushNotification(tokensSnap, title, body);
     return null;
   });

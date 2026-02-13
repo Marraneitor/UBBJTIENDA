@@ -1174,6 +1174,16 @@ function setupVendorAuth() {
 async function loadVendorPanel(sellerId) {
   setLoading(true);
 
+  // Auto-registrar token de notificaciones del vendedor
+  if (!localStorage.getItem('sellerNotifEnabled') && 'Notification' in window && Notification.permission !== 'denied') {
+    saveSellerNotifToken(sellerId).then(t => {
+      if (t) localStorage.setItem('sellerNotifEnabled', 'true');
+    }).catch(() => {});
+  } else if (localStorage.getItem('sellerNotifEnabled')) {
+    // Refrescar token en caso de que haya cambiado
+    saveSellerNotifToken(sellerId).catch(() => {});
+  }
+
   try {
     const sellerDoc = await sellersCol.doc(sellerId).get();
     if (!sellerDoc.exists) {
@@ -2183,6 +2193,19 @@ function setupBuyerAuth() {
 async function loadBuyerProfile(buyerId) {
   setLoading(true);
 
+  // Auto-registrar token de notificaciones del comprador
+  if ('Notification' in window && Notification.permission !== 'denied') {
+    (async () => {
+      try {
+        const bSnap = await buyersCol.doc(buyerId).get();
+        if (bSnap.exists) {
+          const bd = bSnap.data();
+          saveClientNotifToken(buyerId, bd.nombre || 'Cliente', bd.telefono || '').catch(() => {});
+        }
+      } catch(e) {}
+    })();
+  }
+
   try {
     const doc = await buyersCol.doc(buyerId).get();
     if (!doc.exists) {
@@ -2520,18 +2543,9 @@ async function savePurchase(seller, cartItems, totalPrice, paymentMethod) {
       confetti({ particleCount: 120, spread: 80, origin: { y: 0.7 } });
     }
 
-    // Preguntar si quiere recibir notificaciones push
-    if (!localStorage.getItem('fcmToken') && 'Notification' in window) {
-      setTimeout(async () => {
-        const wantsNotif = confirm(
-          '🔔 ¿Quieres recibir notificaciones cuando tu pedido esté listo?\n\n' +
-          'Te avisaremos al instante en tu celular.'
-        );
-        if (wantsNotif) {
-          await saveClientNotifToken(buyerId, compradorNombre, compradorTelefono);
-          showToast('🔔 Notificaciones activadas', 'success');
-        }
-      }, 1500);
+    // Guardar/refrescar token de notificaciones push automáticamente
+    if ('Notification' in window && Notification.permission !== 'denied') {
+      saveClientNotifToken(buyerId, compradorNombre, compradorTelefono).catch(() => {});
     }
 
   } catch (err) {
