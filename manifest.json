@@ -3,24 +3,49 @@
   "short_name": "UBBJ Tienda",
   "description": "Marketplace universitario UBBJ – Sede Minatitlán",
   "start_url": "/index.html",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#1a1a2e",
+  "background_color": "#0a0a1a",
   "theme_color": "#C9A84C",
-  "orientation": "portrait",
+  "orientation": "portrait-primary",
+  "categories": ["shopping", "education"],
+  "lang": "es-MX",
   "icons": [
     {
-      "src": "https://firebasestorage.googleapis.com/v0/b/ubbjtienda.firebasestorage.app/o/Logoubbj.png?alt=media",
+      "src": "/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "https://firebasestorage.googleapis.com/v0/b/ubbjtienda.firebasestorage.app/o/Logoubbj.png?alt=media",
+      "src": "/icons/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
-  "categories": ["shopping", "education"],
-  "lang": "es-MX"
+  "shortcuts": [
+    {
+      "name": "Catálogo",
+      "url": "/index.html",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Vender",
+      "url": "/vender.html",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
 }

@@ -53,14 +53,17 @@ function getMessagingInstance() {
 
 /** Pedir permiso de notificaciones y obtener token FCM */
 async function requestNotificationPermission() {
+  // FCM solo funciona en HTTPS de producción
+  if (location.protocol !== 'https:') {
+    return null;
+  }
+
   if (!('Notification' in window) || !('serviceWorker' in navigator)) {
-    console.log('Notificaciones no soportadas en este navegador');
     return null;
   }
 
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') {
-    console.log('Permiso de notificaciones denegado');
     return null;
   }
 
@@ -168,6 +171,7 @@ function showNotificationToast(title, body) {
     <button class="notif-toast-close" onclick="this.parentElement.remove()">✕</button>
   `;
   document.body.appendChild(toast);
+  playNotificationSound();
   if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
   setTimeout(() => { if (toast.parentElement) toast.remove(); }, 6000);
 }
@@ -179,7 +183,118 @@ if ('serviceWorker' in navigator) {
 
 
 // =============================================
-// 🛠️  UTILIDADES
+// � SONIDO DE NOTIFICACIÓN
+// =============================================
+let _notifAudioCtx = null;
+function playNotificationSound() {
+  try {
+    if (!_notifAudioCtx) _notifAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = _notifAudioCtx;
+    const now = ctx.currentTime;
+    // Chime de dos tonos agradable
+    const gain = ctx.createGain();
+    gain.connect(ctx.destination);
+    gain.gain.setValueAtTime(0.25, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+
+    const osc1 = ctx.createOscillator();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(830, now);
+    osc1.connect(gain);
+    osc1.start(now);
+    osc1.stop(now + 0.3);
+
+    const osc2 = ctx.createOscillator();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(1100, now);
+    osc2.connect(gain);
+    osc2.start(now + 0.15);
+    osc2.stop(now + 0.55);
+  } catch(e) { console.warn('Sound error:', e); }
+}
+
+
+// =============================================
+// ✍️ INDICADOR DE ESCRITURA (TYPING)
+// =============================================
+const typingCol = db.collection('typing');
+
+/** Establece el estado de escritura del usuario en un chat */
+function setTypingStatus(chatId, userId, userName, isTyping) {
+  const docId = chatId + '_' + userId;
+  typingCol.doc(docId).set({
+    chatId: chatId,
+    userId: userId,
+    userName: userName,
+    isTyping: isTyping,
+    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+  }).catch(function(e) { console.warn('Typing write error:', e.message || e); });
+}
+
+/** Crea un debouncer de escritura para un input de chat */
+function createTypingDebouncer(chatId, userId, userName) {
+  let typingTimeout = null;
+  return {
+    onInput: function() {
+      setTypingStatus(chatId, userId, userName, true);
+      if (typingTimeout) clearTimeout(typingTimeout);
+      typingTimeout = setTimeout(function() {
+        setTypingStatus(chatId, userId, userName, false);
+      }, 2500);
+    },
+    stop: function() {
+      if (typingTimeout) clearTimeout(typingTimeout);
+      setTypingStatus(chatId, userId, userName, false);
+    }
+  };
+}
+
+/** Escucha el estado de escritura del otro usuario y muestra indicador.
+ *  Retorna { unsub, renderIndicator } para que se pueda re-renderizar
+ *  después de que el contenedor se vacíe con innerHTML = ''. */
+function listenTypingStatus(chatId, otherUserId, container) {
+  const docId = chatId + '_' + otherUserId;
+  let _active = false;
+  let _name = '';
+
+  function renderIndicator() {
+    let indicator = container.querySelector('.typing-indicator');
+    if (_active) {
+      if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.className = 'typing-indicator';
+        container.appendChild(indicator);
+      }
+      indicator.innerHTML = '<span class="typing-dots"><span>.</span><span>.</span><span>.</span></span> ' + _name + ' está escribiendo';
+      indicator.style.display = 'flex';
+      container.scrollTop = container.scrollHeight;
+    } else if (indicator) {
+      indicator.remove();
+    }
+  }
+
+  const unsub = typingCol.doc(docId).onSnapshot(function(doc) {
+    if (doc.exists && doc.data().isTyping) {
+      const d = doc.data();
+      if (d.timestamp) {
+        const now = Date.now() / 1000;
+        const ts = d.timestamp.seconds || 0;
+        if (now - ts > 5) { _active = false; renderIndicator(); return; }
+      }
+      _name = d.userName || 'Alguien';
+      _active = true;
+    } else {
+      _active = false;
+    }
+    renderIndicator();
+  });
+
+  return { unsub: unsub, renderIndicator: renderIndicator };
+}
+
+
+// =============================================
+// �🛠️  UTILIDADES
 // =============================================
 
 function showToast(message, type = "") {
@@ -2345,13 +2460,22 @@ async function loadBuyerPurchases(buyerId) {
 }
 
 /** Cargar conversaciones abiertas del comprador en ubbjotito */
+let _buyerChatsUnsub = null; // Guardar referencia para desuscribir
 function loadBuyerChats(buyerId) {
   const container = document.getElementById('buyer-chats-list');
   if (!container) return;
 
+  // Desuscribir listener anterior si existe
+  if (_buyerChatsUnsub) { _buyerChatsUnsub(); _buyerChatsUnsub = null; }
+
+  const vendorCache = {}; // Cache info de vendedores
+
   // Escuchar mensajes donde este comprador participa
-  messagesCol.where('compradorId', '==', buyerId)
-    .onSnapshot(async (snap) => {
+  _buyerChatsUnsub = messagesCol.where('compradorId', '==', buyerId)
+    .onSnapshot(function(snap) {
+      // SIEMPRE limpiar primero — sincrónico, sin await
+      container.innerHTML = '';
+
       if (snap.empty) {
         container.innerHTML = '<p class="buyer-chats-empty">No tienes conversaciones aún. Visita un vendedor y envíale un mensaje 💬</p>';
         return;
@@ -2359,65 +2483,75 @@ function loadBuyerChats(buyerId) {
 
       // Ordenar por fecha desc y agrupar por vendedorId
       const allMsgs = [];
-      snap.forEach(doc => allMsgs.push({ id: doc.id, ...doc.data() }));
-      allMsgs.sort((a, b) => (b.fecha ? b.fecha.seconds : 0) - (a.fecha ? a.fecha.seconds : 0));
+      snap.forEach(function(doc) { allMsgs.push({ id: doc.id, ...doc.data() }); });
+      allMsgs.sort(function(a, b) { return (b.fecha ? b.fecha.seconds : 0) - (a.fecha ? a.fecha.seconds : 0); });
 
       const chatMap = new Map();
-      allMsgs.forEach(m => {
+      allMsgs.forEach(function(m) {
         if (!chatMap.has(m.vendedorId)) {
           chatMap.set(m.vendedorId, { ...m, docId: m.id });
         }
       });
 
-      container.innerHTML = '';
-
-      for (const [vendorId, lastMsg] of chatMap) {
-        // Obtener nombre y foto del vendedor
-        let vendorName = 'Vendedor';
-        let vendorFoto = '';
-        try {
-          const vDoc = await sellersCol.doc(vendorId).get();
-          if (vDoc.exists) {
-            vendorName = vDoc.data().nombre || 'Vendedor';
-            vendorFoto = vDoc.data().foto || '';
-          }
-        } catch(e) { /* ignore */ }
-
+      chatMap.forEach(function(lastMsg, vendorId) {
         // Contar no leídos
-        let unread = 0;
-        snap.forEach(doc => {
-          const m = doc.data();
-          if (m.vendedorId === vendorId && m.from === 'vendedor' && !m.leidoPorComprador) {
-            unread++;
-          }
+        var unread = 0;
+        allMsgs.forEach(function(m) {
+          if (m.vendedorId === vendorId && m.from === 'vendedor' && !m.leidoPorComprador) unread++;
         });
 
-        const initials = vendorName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
-        const timeStr = lastMsg.fecha ? new Date(lastMsg.fecha.seconds * 1000).toLocaleString('es-MX', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) : '';
-        const previewText = lastMsg.texto || '';
-        const isFromMe = lastMsg.from === 'comprador';
+        var vendorInfo = vendorCache[vendorId];
+        var vendorName = vendorInfo ? vendorInfo.nombre : 'Cargando...';
+        var vendorFoto = vendorInfo ? vendorInfo.foto : '';
+        var initials = vendorName.split(' ').map(function(w) { return w[0]; }).join('').substring(0, 2).toUpperCase();
+        var timeStr = lastMsg.fecha ? new Date(lastMsg.fecha.seconds * 1000).toLocaleString('es-MX', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) : '';
+        var previewText = lastMsg.texto || '';
+        var isFromMe = lastMsg.from === 'comprador';
 
-        const card = document.createElement('div');
+        var card = document.createElement('div');
         card.className = 'buyer-chat-card' + (unread > 0 ? ' has-unread' : '');
-        card.innerHTML = `
-          <div class="buyer-chat-avatar">
-            ${vendorFoto ? `<img src="${vendorFoto}" alt="${vendorName}">` : `<span>${initials}</span>`}
-          </div>
-          <div class="buyer-chat-info">
-            <div class="buyer-chat-top">
-              <strong class="buyer-chat-name">${vendorName}</strong>
-              <span class="buyer-chat-time">${timeStr}</span>
-            </div>
-            <div class="buyer-chat-preview">
-              ${isFromMe ? '<span class="chat-you">Tú:</span> ' : ''}${previewText.length > 45 ? previewText.substring(0, 45) + '…' : previewText}
-            </div>
-          </div>
-          ${unread > 0 ? `<span class="buyer-chat-unread">${unread}</span>` : ''}
-        `;
+        card.setAttribute('data-vendor-id', vendorId);
+        card.innerHTML =
+          '<div class="buyer-chat-avatar">' +
+            (vendorFoto ? '<img src="' + vendorFoto + '" alt="' + vendorName + '">' : '<span>' + initials + '</span>') +
+          '</div>' +
+          '<div class="buyer-chat-info">' +
+            '<div class="buyer-chat-top">' +
+              '<strong class="buyer-chat-name">' + vendorName + '</strong>' +
+              '<span class="buyer-chat-time">' + timeStr + '</span>' +
+            '</div>' +
+            '<div class="buyer-chat-preview">' +
+              (isFromMe ? '<span class="chat-you">Tú:</span> ' : '') +
+              (previewText.length > 45 ? previewText.substring(0, 45) + '…' : previewText) +
+            '</div>' +
+          '</div>' +
+          (unread > 0 ? '<span class="buyer-chat-unread">' + unread + '</span>' : '');
 
-        card.addEventListener('click', () => openBuyerConvPopup(buyerId, vendorId, vendorName));
+        card.addEventListener('click', function() { openBuyerConvPopup(buyerId, vendorId, vendorName); });
         container.appendChild(card);
-      }
+
+        // Si no tenemos info del vendedor, cargarla async y actualizar la card in-place
+        if (!vendorInfo) {
+          sellersCol.doc(vendorId).get().then(function(vDoc) {
+            var nombre = 'Vendedor', foto = '';
+            if (vDoc.exists) {
+              nombre = vDoc.data().nombre || 'Vendedor';
+              foto = vDoc.data().foto || '';
+            }
+            vendorCache[vendorId] = { nombre: nombre, foto: foto };
+            // Actualizar la card que ya está en el DOM
+            var nameEl = card.querySelector('.buyer-chat-name');
+            var avatarEl = card.querySelector('.buyer-chat-avatar');
+            if (nameEl) nameEl.textContent = nombre;
+            if (avatarEl) {
+              var ini = nombre.split(' ').map(function(w) { return w[0]; }).join('').substring(0, 2).toUpperCase();
+              avatarEl.innerHTML = foto ? '<img src="' + foto + '" alt="' + nombre + '">' : '<span>' + ini + '</span>';
+            }
+          }).catch(function() {
+            vendorCache[vendorId] = { nombre: 'Vendedor', foto: '' };
+          });
+        }
+      });
     });
 }
 
@@ -2438,9 +2572,32 @@ function openBuyerConvPopup(buyerId, vendorId, vendorName) {
 
   const chatId = buyerId + '_' + vendorId;
 
+  // Obtener nombre del comprador para indicador de typing
+  let buyerName = 'Comprador';
+  const bnEl = document.getElementById('buyer-name');
+  if (bnEl && bnEl.textContent) buyerName = bnEl.textContent;
+
+  // Typing debouncer
+  const typingDebouncer = createTypingDebouncer(chatId, buyerId, buyerName);
+
+  // Escuchar typing del vendedor
+  const typingListener = listenTypingStatus(chatId, vendorId, msgContainer);
+
+  // Detectar mensajes nuevos vs carga inicial
+  let isFirstLoad = true;
+
   // Real-time listener
   const unsub = messagesCol.where('chatId', '==', chatId)
     .onSnapshot((snap) => {
+      // Sonido para mensajes nuevos del vendedor
+      if (!isFirstLoad) {
+        snap.docChanges().forEach(function(change) {
+          if (change.type === 'added' && change.doc.data().from === 'vendedor') {
+            playNotificationSound();
+          }
+        });
+      }
+
       const msgs = [];
       snap.forEach(doc => msgs.push({ id: doc.id, ...doc.data() }));
       msgs.sort((a, b) => (a.fecha ? a.fecha.seconds : 0) - (b.fecha ? b.fecha.seconds : 0));
@@ -2457,7 +2614,12 @@ function openBuyerConvPopup(buyerId, vendorId, vendorName) {
           messagesCol.doc(m.id).update({ leidoPorComprador: true });
         }
       });
+
+      // Re-renderizar indicador de typing después de vaciar
+      typingListener.renderIndicator();
+
       msgContainer.scrollTop = msgContainer.scrollHeight;
+      isFirstLoad = false;
     }, (err) => console.error('Chat listener error:', err));
 
   // Send — always read from live DOM element by ID
@@ -2466,6 +2628,7 @@ function openBuyerConvPopup(buyerId, vendorId, vendorName) {
     if (!liveInput) return;
     const text = liveInput.value.trim();
     if (!text) return;
+    typingDebouncer.stop();
     messagesCol.add({
       chatId,
       compradorId: buyerId,
@@ -2488,6 +2651,7 @@ function openBuyerConvPopup(buyerId, vendorId, vendorName) {
   const newInput = input.cloneNode(true);
   input.parentNode.replaceChild(newInput, input);
   newInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendMsg(); });
+  newInput.addEventListener('input', function() { typingDebouncer.onInput(); });
   newInput.focus();
 
   // Close
@@ -2495,6 +2659,8 @@ function openBuyerConvPopup(buyerId, vendorId, vendorName) {
   closeBtn.parentNode.replaceChild(newClose, closeBtn);
   newClose.addEventListener('click', () => {
     popup.style.display = 'none';
+    typingDebouncer.stop();
+    typingListener.unsub();
     unsub();
   });
 }
@@ -2689,6 +2855,21 @@ function setupProfileChat(sellerId, seller) {
   const chatId = buyerId + '_' + sellerId;
   let isOpen = false;
 
+  // Obtener nombre del comprador para typing
+  let buyerName = 'Comprador';
+  (async function() {
+    try {
+      const bDoc = await buyersCol.doc(buyerId).get();
+      if (bDoc.exists) buyerName = bDoc.data().nombre || 'Comprador';
+    } catch(e) {}
+  })();
+
+  // Typing debouncer
+  const typingDebouncer = createTypingDebouncer(chatId, buyerId, buyerName);
+
+  // Escuchar typing del vendedor
+  const typingListener = listenTypingStatus(chatId, sellerId, msgContainer);
+
   // Toggle popup
   fabBtn.addEventListener('click', () => {
     isOpen = !isOpen;
@@ -2704,12 +2885,23 @@ function setupProfileChat(sellerId, seller) {
   popupClose.addEventListener('click', () => {
     isOpen = false;
     popup.style.display = 'none';
+    typingDebouncer.stop();
   });
 
   // Listen to messages in real-time
   let unreadCount = 0;
+  let isFirstLoad = true;
   messagesCol.where('chatId', '==', chatId)
     .onSnapshot((snap) => {
+      // Sonido para mensajes nuevos del vendedor
+      if (!isFirstLoad) {
+        snap.docChanges().forEach(function(change) {
+          if (change.type === 'added' && change.doc.data().from === 'vendedor') {
+            playNotificationSound();
+          }
+        });
+      }
+
       // Sort client-side by fecha
       const msgs = [];
       snap.forEach(doc => msgs.push({ id: doc.id, ...doc.data() }));
@@ -2723,6 +2915,7 @@ function setupProfileChat(sellerId, seller) {
       unreadCount = 0;
       if (msgs.length === 0) {
         msgContainer.innerHTML = '<p class="chat-empty">\u00a1Inicia la conversaci\u00f3n! \ud83d\udc4b</p>';
+        isFirstLoad = false;
         return;
       }
       msgs.forEach(m => {
@@ -2741,6 +2934,9 @@ function setupProfileChat(sellerId, seller) {
       });
       msgContainer.scrollTop = msgContainer.scrollHeight;
 
+      // Re-renderizar indicador de typing
+      typingListener.renderIndicator();
+
       // Update badge
       if (!isOpen && unreadCount > 0) {
         fabBadge.textContent = unreadCount;
@@ -2748,6 +2944,7 @@ function setupProfileChat(sellerId, seller) {
       } else {
         fabBadge.style.display = 'none';
       }
+      isFirstLoad = false;
     }, (err) => {
       console.error('Chat listener error:', err);
     });
@@ -2755,6 +2952,7 @@ function setupProfileChat(sellerId, seller) {
   function sendMsg() {
     const text = input.value.trim();
     if (!text) return;
+    typingDebouncer.stop();
     messagesCol.add({
       chatId: chatId,
       compradorId: buyerId,
@@ -2770,6 +2968,7 @@ function setupProfileChat(sellerId, seller) {
 
   sendBtn.addEventListener('click', sendMsg);
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendMsg(); });
+  input.addEventListener('input', function() { typingDebouncer.onInput(); });
 }
 function setupVendorChat(sellerId) {
   const headsContainer = document.getElementById('vendor-chat-heads');
@@ -2785,11 +2984,24 @@ function setupVendorChat(sellerId) {
 
   let activeChat = null;
   let activeUnsub = null;
+  let activeTypingDebouncer = null;
+  let activeTypingListener = null;
+
+  // Obtener nombre del vendedor para typing
+  let sellerName = 'Vendedor';
+  (async function() {
+    try {
+      const sDoc = await sellersCol.doc(sellerId).get();
+      if (sDoc.exists) sellerName = sDoc.data().nombre || 'Vendedor';
+    } catch(e) {}
+  })();
 
   // Close popup
   if (closeBtn) closeBtn.addEventListener('click', () => {
     popup.style.display = 'none';
     if (activeUnsub) { activeUnsub(); activeUnsub = null; }
+    if (activeTypingDebouncer) { activeTypingDebouncer.stop(); activeTypingDebouncer = null; }
+    if (activeTypingListener) { activeTypingListener.unsub(); activeTypingListener = null; }
     activeChat = null;
     // Remove active state from heads
     headsContainer.querySelectorAll('.chat-head').forEach(h => h.classList.remove('active'));
@@ -2801,19 +3013,30 @@ function setupVendorChat(sellerId) {
   });
 
   // Listen for all messages to this vendor
+  let isFirstVendorLoad = true;
+  const buyerCache = {};
   messagesCol.where('vendedorId', '==', sellerId)
-    .onSnapshot(async (snap) => {
+    .onSnapshot(function(snap) {
+      // Sonido para mensajes nuevos del comprador
+      if (!isFirstVendorLoad) {
+        snap.docChanges().forEach(function(change) {
+          if (change.type === 'added' && change.doc.data().from === 'comprador') {
+            playNotificationSound();
+          }
+        });
+      }
+
       const chats = {};
       let totalUnread = 0;
 
       // Sort desc by fecha for grouping (latest first)
       const allMsgs = [];
-      snap.forEach(doc => allMsgs.push({ id: doc.id, ...doc.data() }));
-      allMsgs.sort((a, b) => (b.fecha ? b.fecha.seconds : 0) - (a.fecha ? a.fecha.seconds : 0));
+      snap.forEach(function(doc) { allMsgs.push({ id: doc.id, ...doc.data() }); });
+      allMsgs.sort(function(a, b) { return (b.fecha ? b.fecha.seconds : 0) - (a.fecha ? a.fecha.seconds : 0); });
 
-      allMsgs.forEach(m => {
+      allMsgs.forEach(function(m) {
         if (!chats[m.chatId]) {
-          chats[m.chatId] = { compradorId: m.compradorId, lastMsg: m, unread: 0, docIds: [] };
+          chats[m.chatId] = { compradorId: m.compradorId, lastMsg: m, unread: 0 };
         }
         if (m.from === 'comprador' && !m.leidoPorVendedor) {
           chats[m.chatId].unread++;
@@ -2828,41 +3051,49 @@ function setupVendorChat(sellerId) {
         document.title = 'UBBJ Tienda \u2014 Panel del Vendedor';
       }
 
-      // Build chat heads
+      // Build chat heads — sincrónico, sin await
       const chatIds = Object.keys(chats);
       headsContainer.innerHTML = '';
 
-      for (let i = 0; i < Math.min(chatIds.length, 8); i++) {
-        const cid = chatIds[i];
-        const chat = chats[cid];
-        let buyerName = 'Comprador';
-        try {
-          const bDoc = await buyersCol.doc(chat.compradorId).get();
-          if (bDoc.exists) buyerName = bDoc.data().nombre || 'Comprador';
-        } catch(e) {}
+      for (var i = 0; i < Math.min(chatIds.length, 8); i++) {
+        (function(cid) {
+          const chat = chats[cid];
+          const cachedName = buyerCache[chat.compradorId];
+          const buyerName = cachedName || 'Comprador';
 
-        const head = document.createElement('div');
-        head.className = 'chat-head' + (chat.unread > 0 ? ' has-unread' : '') + (activeChat === cid ? ' active' : '');
+          const head = document.createElement('div');
+          head.className = 'chat-head' + (chat.unread > 0 ? ' has-unread' : '') + (activeChat === cid ? ' active' : '');
 
-        // Create initials
-        const initials = buyerName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
-        head.innerHTML = '<span>' + initials + '</span>' +
-          '<span class="chat-head-name">' + buyerName + '</span>' +
-          (chat.unread > 0 ? '<span class="chat-head-badge">' + chat.unread + '</span>' : '');
+          const initials = buyerName.split(' ').map(function(w) { return w[0]; }).join('').substring(0, 2).toUpperCase();
+          head.innerHTML = '<span>' + initials + '</span>' +
+            '<span class="chat-head-name">' + buyerName + '</span>' +
+            (chat.unread > 0 ? '<span class="chat-head-badge">' + chat.unread + '</span>' : '');
 
-        head.addEventListener('click', () => {
-          openVendorChatPopup(sellerId, chat.compradorId, cid, buyerName);
-          // Mark this head as active
-          headsContainer.querySelectorAll('.chat-head').forEach(h => h.classList.remove('active'));
-          head.classList.add('active');
-        });
+          head.addEventListener('click', function() {
+            var currentName = buyerCache[chat.compradorId] || buyerName;
+            openVendorChatPopup(sellerId, chat.compradorId, cid, currentName);
+            headsContainer.querySelectorAll('.chat-head').forEach(function(h) { h.classList.remove('active'); });
+            head.classList.add('active');
+          });
 
-        headsContainer.appendChild(head);
+          headsContainer.appendChild(head);
+
+          // Si no hay cache, cargar async y actualizar in-place
+          if (!cachedName) {
+            buyersCol.doc(chat.compradorId).get().then(function(bDoc) {
+              var nombre = bDoc.exists ? (bDoc.data().nombre || 'Comprador') : 'Comprador';
+              buyerCache[chat.compradorId] = nombre;
+              var nameEl = head.querySelector('.chat-head-name');
+              if (nameEl) nameEl.textContent = nombre;
+              var ini = nombre.split(' ').map(function(w) { return w[0]; }).join('').substring(0, 2).toUpperCase();
+              var spanEl = head.querySelector('span');
+              if (spanEl) spanEl.textContent = ini;
+            }).catch(function() { buyerCache[chat.compradorId] = 'Comprador'; });
+          }
+        })(chatIds[i]);
       }
 
-      // Update the active chat badge in the orders section
-      const ordersBadge = document.getElementById('orders-pending-badge');
-      // (orders badge is handled by loadVendorOrders)
+      isFirstVendorLoad = false;
     });
 
   function openVendorChatPopup(vendorId, buyerId, chatId, buyerName) {
@@ -2872,11 +3103,28 @@ function setupVendorChat(sellerId) {
     popupName.textContent = buyerName;
     popup.style.display = 'flex';
 
-    // Unsubscribe from previous listener
+    // Limpiar listeners anteriores
     if (activeUnsub) activeUnsub();
+    if (activeTypingDebouncer) { activeTypingDebouncer.stop(); activeTypingDebouncer = null; }
+    if (activeTypingListener) { activeTypingListener.unsub(); activeTypingListener = null; }
+
+    // Typing: vendedor escribe, comprador ve
+    activeTypingDebouncer = createTypingDebouncer(chatId, vendorId, sellerName);
+    activeTypingListener = listenTypingStatus(chatId, buyerId, msgContainer);
+
+    let isFirstPopupLoad = true;
 
     activeUnsub = messagesCol.where('chatId', '==', chatId)
       .onSnapshot((snap) => {
+        // Sonido para mensajes nuevos del comprador en chat abierto
+        if (!isFirstPopupLoad) {
+          snap.docChanges().forEach(function(change) {
+            if (change.type === 'added' && change.doc.data().from === 'comprador') {
+              playNotificationSound();
+            }
+          });
+        }
+
         const msgs = [];
         snap.forEach(doc => msgs.push({ id: doc.id, ...doc.data() }));
         msgs.sort((a, b) => (a.fecha ? a.fecha.seconds : 0) - (b.fecha ? b.fecha.seconds : 0));
@@ -2892,12 +3140,17 @@ function setupVendorChat(sellerId) {
             messagesCol.doc(m.id).update({ leidoPorVendedor: true });
           }
         });
+        // Re-renderizar indicador de typing
+        if (activeTypingListener) activeTypingListener.renderIndicator();
+
         msgContainer.scrollTop = msgContainer.scrollHeight;
+        isFirstPopupLoad = false;
       }, (err) => console.error('Vendor chat listener error:', err));
 
     function sendMsg() {
       const text = input.value.trim();
       if (!text) return;
+      if (activeTypingDebouncer) activeTypingDebouncer.stop();
       messagesCol.add({
         chatId: chatId,
         compradorId: buyerId,
@@ -2913,6 +3166,7 @@ function setupVendorChat(sellerId) {
 
     sendBtn.onclick = sendMsg;
     input.onkeydown = (e) => { if (e.key === 'Enter') sendMsg(); };
+    input.oninput = function() { if (activeTypingDebouncer) activeTypingDebouncer.onInput(); };
     input.focus();
   }
 }
@@ -3080,7 +3334,52 @@ async function loadVendorOrders(sellerId) {
 
 
 // =============================================
-// 🚀 INICIALIZACIÓN
+// � PWA INSTALL PROMPT
+// =============================================
+let deferredPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+
+  // No mostrar si el usuario ya lo cerró recientemente (7 días)
+  const dismissed = localStorage.getItem('pwa-install-dismissed');
+  if (dismissed && (Date.now() - parseInt(dismissed, 10)) < 7 * 24 * 60 * 60 * 1000) return;
+
+  const banner = document.getElementById('pwa-install-banner');
+  if (banner) banner.style.display = 'block';
+});
+
+document.addEventListener('click', (e) => {
+  if (e.target.id === 'pwa-install-btn' || e.target.closest('#pwa-install-btn')) {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then((choice) => {
+      if (choice.outcome === 'accepted') {
+        console.log('✅ PWA instalada');
+      }
+      deferredPrompt = null;
+      const banner = document.getElementById('pwa-install-banner');
+      if (banner) banner.style.display = 'none';
+    });
+  }
+
+  if (e.target.id === 'pwa-install-close' || e.target.closest('#pwa-install-close')) {
+    const banner = document.getElementById('pwa-install-banner');
+    if (banner) banner.style.display = 'none';
+    localStorage.setItem('pwa-install-dismissed', Date.now().toString());
+  }
+});
+
+window.addEventListener('appinstalled', () => {
+  console.log('✅ UBBJ Tienda instalada como PWA');
+  const banner = document.getElementById('pwa-install-banner');
+  if (banner) banner.style.display = 'none';
+  deferredPrompt = null;
+});
+
+// =============================================
+// �🚀 INICIALIZACIÓN
 // =============================================
 
 document.addEventListener("DOMContentLoaded", () => {
