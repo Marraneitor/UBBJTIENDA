@@ -1845,6 +1845,45 @@ async function loadAdminData() {
       }
     }
 
+    // Ubbjotitos registrados
+    const buyersList = document.getElementById("buyers-list");
+    if (buyersList) {
+      try {
+        const buyersSnap = await buyersCol.orderBy("creadoEn", "desc").get();
+        setText("stat-buyers", buyersSnap.size);
+        if (buyersSnap.empty) {
+          buyersList.innerHTML = '<li style="color:var(--text-secondary)">No hay ubbjotitos registrados</li>';
+        } else {
+          buyersList.innerHTML = "";
+          buyersSnap.forEach((doc) => {
+            const b = doc.data();
+            const li = document.createElement("li");
+            li.className = "pending-item buyer-item";
+            li.setAttribute("data-search", `${(b.nombre || '').toLowerCase()} ${(b.grupo || '').toLowerCase()} ${(b.telefono || '').toLowerCase()}`);
+            const fecha = b.creadoEn ? formatDate(b.creadoEn) : 'Sin fecha';
+            li.innerHTML = `
+              <div class="pending-info">
+                <img src="${b.foto || 'https://placehold.co/48/e2e8f0/64748b?text=🐾'}" alt="">
+                <div>
+                  <div class="name">${b.nombre || 'Sin nombre'} <span class="badge badge-buyer">Ubbjotito</span></div>
+                  <div class="details">📚 Grupo: <strong>${b.grupo || 'N/A'}</strong> · 📱 ${b.telefono || 'Sin teléfono'}</div>
+                  <div class="details">🎓 ${b.carrera || 'Sin carrera'}</div>
+                  <div class="details" style="margin-top:0.25rem;font-size:0.75rem;color:var(--text-secondary)">📅 Registrado: ${fecha}</div>
+                </div>
+              </div>
+              <div class="pending-actions">
+                <a href="https://wa.me/52${(b.telefono || '').replace(/\D/g, '')}" target="_blank" class="btn btn-success btn-sm">💬 WhatsApp</a>
+                <button class="btn btn-danger btn-sm" onclick="deleteBuyer('${doc.id}')" title="Eliminar cuenta">🗑 Eliminar</button>
+              </div>`;
+            buyersList.appendChild(li);
+          });
+        }
+      } catch (err) {
+        console.error("Error cargando ubbjotitos:", err);
+        buyersList.innerHTML = '<li style="color:var(--text-secondary)">Error cargando ubbjotitos</li>';
+      }
+    }
+
     // Quejas / Reportes
     const complaintsList = document.getElementById("complaints-list");
     if (complaintsList) {
@@ -1940,6 +1979,35 @@ async function removeSeller(id) {
   }
   setLoading(false);
 }
+
+// Eliminar Ubbjotito (comprador)
+async function deleteBuyer(id) {
+  if (!confirm("¿Eliminar esta cuenta de ubbjotito?")) return;
+  setLoading(true);
+  try {
+    await buyersCol.doc(id).delete();
+    showToast("Ubbjotito eliminado", "success");
+    loadAdminData();
+  } catch (err) {
+    console.error("Error eliminando ubbjotito:", err);
+    showToast("Error al eliminar", "error");
+  }
+  setLoading(false);
+}
+
+// Buscador de ubbjotitos
+document.addEventListener("DOMContentLoaded", () => {
+  const searchInput = document.getElementById("search-buyers");
+  if (searchInput) {
+    searchInput.addEventListener("input", () => {
+      const query = searchInput.value.toLowerCase().trim();
+      document.querySelectorAll("#buyers-list .buyer-item").forEach(item => {
+        const searchData = item.getAttribute("data-search") || "";
+        item.style.display = searchData.includes(query) ? "" : "none";
+      });
+    });
+  }
+});
 
 
 // =============================================

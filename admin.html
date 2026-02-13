@@ -79,6 +79,10 @@
         <div id="stat-interactions" class="stat-number">0</div>
         <div class="stat-label">Contactos (WhatsApp)</div>
       </div>
+      <div class="stat-card">
+        <div id="stat-buyers" class="stat-number">0</div>
+        <div class="stat-label">Ubbjotitos registrados</div>
+      </div>
     </div>
 
     <!-- Vendedores pendientes -->
@@ -93,6 +97,17 @@
     <section class="admin-section">
       <h2>✅ Vendedores aprobados</h2>
       <ul id="approved-sellers-list" class="pending-list">
+        <li style="color:var(--text-secondary)">Cargando...</li>
+      </ul>
+    </section>
+
+    <!-- Ubbjotitos registrados -->
+    <section class="admin-section">
+      <h2>🐾 Ubbjotitos registrados</h2>
+      <div class="admin-search-bar">
+        <input type="text" id="search-buyers" placeholder="🔍 Buscar por nombre, grupo o teléfono..." class="admin-search-input">
+      </div>
+      <ul id="buyers-list" class="pending-list">
         <li style="color:var(--text-secondary)">Cargando...</li>
       </ul>
     </section>
