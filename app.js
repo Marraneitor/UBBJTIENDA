@@ -95,6 +95,17 @@ async function saveClientNotifToken(compradorId, compradorNombre, compradorTelef
   if (!token || !compradorId) return null;
 
   try {
+    // Borrar tokens viejos de este comprador antes de guardar el nuevo
+    const oldTokens = await db.collection('notifTokens')
+      .where('tipo', '==', 'comprador')
+      .where('compradorId', '==', compradorId)
+      .get();
+    const batch = db.batch();
+    oldTokens.forEach(doc => {
+      if (doc.id !== token) batch.delete(doc.ref);
+    });
+    await batch.commit();
+
     await db.collection('notifTokens').doc(token).set({
       token,
       tipo: 'comprador',
@@ -103,6 +114,7 @@ async function saveClientNotifToken(compradorId, compradorNombre, compradorTelef
       telefono: compradorTelefono || '',
       actualizadoEn: firebase.firestore.FieldValue.serverTimestamp()
     });
+    console.log('✅ Token comprador guardado, tokens viejos limpiados');
   } catch (err) {
     console.error('Error guardando token de comprador:', err);
   }
@@ -115,12 +127,24 @@ async function saveSellerNotifToken(sellerId) {
   if (!token || !sellerId) return null;
 
   try {
+    // Borrar tokens viejos de este vendedor antes de guardar el nuevo
+    const oldTokens = await db.collection('notifTokens')
+      .where('tipo', '==', 'vendedor')
+      .where('vendedorId', '==', sellerId)
+      .get();
+    const batch = db.batch();
+    oldTokens.forEach(doc => {
+      if (doc.id !== token) batch.delete(doc.ref);
+    });
+    await batch.commit();
+
     await db.collection('notifTokens').doc(token).set({
       token,
       tipo: 'vendedor',
       vendedorId: sellerId,
       actualizadoEn: firebase.firestore.FieldValue.serverTimestamp()
     });
+    console.log('✅ Token vendedor guardado, tokens viejos limpiados');
   } catch (err) {
     console.error('Error guardando token de vendedor:', err);
   }

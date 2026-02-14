@@ -118,59 +118,76 @@ exports.notifyOnNewMessage = functions.firestore
   .document('mensajes/{messageId}')
   .onCreate(async (snap, context) => {
     const msg = snap.data();
-    const from = msg.from; // 'comprador' o 'vendedor'
+    console.log('🔵 NUEVO MENSAJE detectado:', JSON.stringify(msg));
+    const from = msg.from;
     const texto = msg.texto || '';
 
-    if (!from || !texto) return null;
+    if (!from || !texto) {
+      console.log('⚠️ Mensaje sin from o texto, saliendo');
+      return null;
+    }
 
     let targetType, targetId, senderName;
 
     if (from === 'comprador') {
-      // Comprador envió → notificar al vendedor
       targetType = 'vendedor';
       targetId = msg.vendedorId || '';
+      console.log(`🔵 Comprador envió mensaje. vendedorId objetivo: "${targetId}"`);
       try {
         const buyerDoc = await db.collection('compradores').doc(msg.compradorId || '').get();
         senderName = buyerDoc.exists ? buyerDoc.data().nombre : 'Un cliente';
       } catch(e) { senderName = 'Un cliente'; }
     } else if (from === 'vendedor') {
-      // Vendedor envió → notificar al comprador
       targetType = 'comprador';
       targetId = msg.compradorId || '';
+      console.log(`🔵 Vendedor envió mensaje. compradorId objetivo: "${targetId}"`);
       try {
         const sellerDoc = await db.collection('vendedores').doc(msg.vendedorId || '').get();
         senderName = sellerDoc.exists ? sellerDoc.data().nombre : 'Un vendedor';
       } catch(e) { senderName = 'Un vendedor'; }
     } else {
+      console.log(`⚠️ from desconocido: "${from}"`);
       return null;
     }
 
-    if (!targetId) return null;
+    if (!targetId) {
+      console.log('⚠️ targetId vacío, saliendo');
+      return null;
+    }
 
     const tokenField = targetType === 'vendedor' ? 'vendedorId' : 'compradorId';
+    console.log(`🔵 Buscando tokens: tipo="${targetType}", ${tokenField}="${targetId}"`);
+
     const tokensSnap = await db.collection('notifTokens')
       .where('tipo', '==', targetType)
       .where(tokenField, '==', targetId)
       .get();
 
-    if (tokensSnap.empty) return null;
+    console.log(`🔵 Tokens encontrados: ${tokensSnap.size}`);
+    tokensSnap.docs.forEach((doc, i) => {
+      const d = doc.data();
+      console.log(`🔵 Token ${i}: tipo=${d.tipo}, vendedorId=${d.vendedorId||'N/A'}, compradorId=${d.compradorId||'N/A'}, token=${(d.token||'').substring(0,20)}...`);
+    });
+
+    if (tokensSnap.empty) {
+      console.log('⚠️ No hay tokens para el destinatario');
+      return null;
+    }
 
     const title = `💬 Mensaje de ${senderName}`;
     const body = texto.length > 100 ? texto.substring(0, 100) + '...' : texto;
 
-    // Construir URL para abrir la conversación al hacer clic
     let chatUrl = 'https://ubbjtienda.vercel.app/';
     if (from === 'comprador') {
-      // El vendedor recibe la notif → abrir su panel
       chatUrl = 'https://ubbjtienda.vercel.app/perfilvendedor';
     } else if (from === 'vendedor') {
-      // El comprador recibe la notif → abrir perfil del vendedor con chat
       const vendedorId = msg.vendedorId || '';
       if (vendedorId) {
         chatUrl = `https://ubbjtienda.vercel.app/perfil?id=${vendedorId}&openchat=1`;
       }
     }
 
+    console.log(`🔵 Enviando: title="${title}", body="${body}", url="${chatUrl}"`);
     await sendPushNotification(tokensSnap, title, body, { url: chatUrl });
     return null;
   });
