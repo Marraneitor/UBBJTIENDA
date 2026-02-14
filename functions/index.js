@@ -5,7 +5,7 @@ admin.initializeApp();
 const db = admin.firestore();
 
 // Helper para enviar notificaciones y limpiar tokens inválidos
-async function sendPushNotification(tokensSnap, title, body) {
+async function sendPushNotification(tokensSnap, title, body, dataPayload = {}) {
   const tokens = tokensSnap.docs.map(doc => doc.data().token).filter(Boolean);
   if (tokens.length === 0) return;
 
@@ -13,11 +13,15 @@ async function sendPushNotification(tokensSnap, title, body) {
 
   const response = await admin.messaging().sendEachForMulticast({
     notification: { title, body },
+    data: dataPayload,
     webpush: {
       notification: {
         icon: 'https://ubbjtienda.vercel.app/Logoubbj.png',
         badge: 'https://ubbjtienda.vercel.app/Logoubbj.png',
         vibrate: [200, 100, 200]
+      },
+      fcmOptions: {
+        link: dataPayload.url || 'https://ubbjtienda.vercel.app/'
       }
     },
     tokens
@@ -143,6 +147,19 @@ exports.notifyOnNewMessage = functions.firestore
     const title = `💬 Mensaje de ${senderName}`;
     const body = texto.length > 100 ? texto.substring(0, 100) + '...' : texto;
 
-    await sendPushNotification(tokensSnap, title, body);
+    // Construir URL para abrir la conversación al hacer clic
+    let chatUrl = 'https://ubbjtienda.vercel.app/';
+    if (from === 'comprador') {
+      // El vendedor recibe la notif → abrir su panel
+      chatUrl = 'https://ubbjtienda.vercel.app/perfilvendedor';
+    } else if (from === 'vendedor') {
+      // El comprador recibe la notif → abrir perfil del vendedor con chat
+      const vendedorId = msg.vendedorId || '';
+      if (vendedorId) {
+        chatUrl = `https://ubbjtienda.vercel.app/perfil?id=${vendedorId}&openchat=1`;
+      }
+    }
+
+    await sendPushNotification(tokensSnap, title, body, { url: chatUrl });
     return null;
   });

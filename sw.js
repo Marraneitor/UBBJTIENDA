@@ -130,5 +130,23 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  event.waitUntil(clients.openWindow(event.notification.data?.url || "/"));
+  const url = event.notification.data?.url || event.notification.data?.FCM_MSG?.data?.url || "/";
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+      // Si ya hay una ventana abierta con esa URL, enfocarla
+      for (const client of windowClients) {
+        if (client.url.includes(url.replace('https://ubbjtienda.vercel.app', '')) && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      // Si hay alguna ventana abierta, navegar a la URL
+      if (windowClients.length > 0) {
+        const client = windowClients[0];
+        client.navigate(url);
+        return client.focus();
+      }
+      // Si no hay ventanas, abrir una nueva
+      return clients.openWindow(url);
+    })
+  );
 });

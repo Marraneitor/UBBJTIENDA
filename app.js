@@ -135,19 +135,25 @@ function listenForegroundNotifications() {
     messaging.onMessage((payload) => {
       const title = payload.notification?.title || '🔔 UBBJ Tienda';
       const body = payload.notification?.body || '';
+      const chatUrl = payload.data?.url || null;
 
       // Notificación nativa del navegador
       if (Notification.permission === 'granted') {
         const n = new Notification(title, {
           body,
           icon: '/Logoubbj.png',
-          vibrate: [200, 100, 200]
+          vibrate: [200, 100, 200],
+          data: { url: chatUrl }
         });
-        n.onclick = () => { window.focus(); n.close(); };
+        n.onclick = () => {
+          window.focus();
+          n.close();
+          if (chatUrl) window.location.href = chatUrl;
+        };
       }
 
       // Toast visual en la app
-      showNotificationToast(title, body);
+      showNotificationToast(title, body, chatUrl);
     });
   } catch (err) {
     console.warn('Error listener foreground:', err);
@@ -155,21 +161,28 @@ function listenForegroundNotifications() {
 }
 
 /** Toast de notificación visible en la app */
-function showNotificationToast(title, body) {
+function showNotificationToast(title, body, chatUrl) {
   const prev = document.getElementById('notif-toast');
   if (prev) prev.remove();
 
   const toast = document.createElement('div');
   toast.id = 'notif-toast';
   toast.className = 'notification-toast';
+  if (chatUrl) toast.style.cursor = 'pointer';
   toast.innerHTML = `
     <div class="notif-toast-icon">🔔</div>
     <div class="notif-toast-content">
       <strong>${title}</strong>
       <p>${body}</p>
     </div>
-    <button class="notif-toast-close" onclick="this.parentElement.remove()">✕</button>
+    <button class="notif-toast-close" onclick="event.stopPropagation(); this.parentElement.remove()">✕</button>
   `;
+  if (chatUrl) {
+    toast.addEventListener('click', () => {
+      toast.remove();
+      window.location.href = chatUrl;
+    });
+  }
   document.body.appendChild(toast);
   playNotificationSound();
   if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
@@ -1067,6 +1080,12 @@ async function loadProfile() {
 
     // Chat comprador-vendedor
     setupProfileChat(sellerId, s);
+
+    // Auto-abrir chat si viene de notificación
+    if (urlParams.get('openchat') === '1') {
+      const fabBtn = document.getElementById('chat-fab-btn');
+      if (fabBtn) setTimeout(() => fabBtn.click(), 500);
+    }
 
   } catch (err) {
     console.error("Error cargando perfil:", err);
