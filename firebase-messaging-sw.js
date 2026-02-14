@@ -40,7 +40,7 @@ self.addEventListener('notificationclick', (event) => {
 // =============================================
 // 📦 CACHING (PWA)
 // =============================================
-const CACHE_NAME = "ubbj-tienda-v8";
+const CACHE_NAME = "ubbj-tienda-v9";
 const PRECACHE_URLS = [
   "/",
   "/index.html",
