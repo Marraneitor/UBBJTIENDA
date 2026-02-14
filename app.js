@@ -133,8 +133,9 @@ function listenForegroundNotifications() {
     if (!messaging) return;
 
     messaging.onMessage((payload) => {
-      const title = payload.notification?.title || '🔔 UBBJ Tienda';
-      const body = payload.notification?.body || '';
+      // Leer de data (data-only) o notification como fallback
+      const title = payload.data?.title || payload.notification?.title || '🔔 UBBJ Tienda';
+      const body = payload.data?.body || payload.notification?.body || '';
       const chatUrl = payload.data?.url || null;
 
       // Notificación nativa del navegador

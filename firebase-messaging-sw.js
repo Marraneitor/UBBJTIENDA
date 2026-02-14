@@ -1,4 +1,4 @@
-// UBBJ Tienda – Firebase Messaging Service Worker
+// UBBJ Tienda – Firebase Messaging Service Worker v2
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
 
@@ -17,29 +17,37 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   console.log('📨 Notificación en segundo plano:', payload);
 
-  const title = payload.notification?.title || '🔔 UBBJ Tienda';
-  const body = payload.notification?.body || 'Tienes una actualización';
+  // Leer de data (mensajes data-only) o de notification como fallback
+  const title = payload.data?.title || payload.notification?.title || '🔔 UBBJ Tienda';
+  const body = payload.data?.body || payload.notification?.body || 'Tienes una actualización';
+  const url = payload.data?.url || '/';
 
   self.registration.showNotification(title, {
     body,
     icon: '/Logoubbj.png',
     badge: '/Logoubbj.png',
     vibrate: [200, 100, 200, 100, 200],
-    tag: 'ubbj-order-' + Date.now(),
+    tag: 'ubbj-notif-' + Date.now(),
     renotify: true,
-    data: payload.data
+    data: { url }
   });
 });
 
-// Al hacer clic en la notificación, abrir la app
+// Al hacer clic en la notificación, abrir la conversación/página correcta
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  const targetUrl = event.notification.data?.url || '/';
+
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
+      // Si hay una ventana abierta, navegar a la URL y enfocar
       if (clientList.length > 0) {
-        return clientList[0].focus();
+        const client = clientList[0];
+        client.navigate(targetUrl);
+        return client.focus();
       }
-      return clients.openWindow('/');
+      // Si no hay ventanas, abrir una nueva
+      return clients.openWindow(targetUrl);
     })
   );
 });

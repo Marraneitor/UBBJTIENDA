@@ -5,24 +5,23 @@ admin.initializeApp();
 const db = admin.firestore();
 
 // Helper para enviar notificaciones y limpiar tokens inválidos
+// Usa mensajes data-only para control total del display en el SW
 async function sendPushNotification(tokensSnap, title, body, dataPayload = {}) {
   const tokens = tokensSnap.docs.map(doc => doc.data().token).filter(Boolean);
   if (tokens.length === 0) return;
 
   console.log(`📨 Enviando notificación a ${tokens.length} dispositivo(s)`);
 
+  // Enviar como data-only (sin notification field) para que
+  // firebase-messaging-sw.js maneje todo y podamos controlar el click
   const response = await admin.messaging().sendEachForMulticast({
-    notification: { title, body },
-    data: dataPayload,
+    data: {
+      title,
+      body,
+      ...dataPayload
+    },
     webpush: {
-      notification: {
-        icon: 'https://ubbjtienda.vercel.app/Logoubbj.png',
-        badge: 'https://ubbjtienda.vercel.app/Logoubbj.png',
-        vibrate: [200, 100, 200]
-      },
-      fcmOptions: {
-        link: dataPayload.url || 'https://ubbjtienda.vercel.app/'
-      }
+      headers: { Urgency: 'high' }
     },
     tokens
   });
@@ -72,7 +71,7 @@ exports.notifyClientOnOrderUpdate = functions.firestore
       .get();
 
     if (tokensSnap.empty) return null;
-    await sendPushNotification(tokensSnap, title, body);
+    await sendPushNotification(tokensSnap, title, body, { url: 'https://ubbjtienda.vercel.app/ubbjotito' });
     return null;
   });
 
@@ -96,7 +95,7 @@ exports.notifySellerOnNewOrder = functions.firestore
       .get();
 
     if (tokensSnap.empty) return null;
-    await sendPushNotification(tokensSnap, title, body);
+    await sendPushNotification(tokensSnap, title, body, { url: 'https://ubbjtienda.vercel.app/perfilvendedor' });
     return null;
   });
 
