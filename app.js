@@ -68,8 +68,8 @@ async function requestNotificationPermission() {
   }
 
   try {
-    // Reutilizar el SW principal (sw.js) que ya incluye Firebase Messaging
-    const swReg = await navigator.serviceWorker.ready;
+    // Registrar firebase-messaging-sw.js explícitamente para FCM
+    const swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
     const messaging = getMessagingInstance();
     if (!messaging) return null;
 

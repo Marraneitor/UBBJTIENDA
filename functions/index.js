@@ -33,6 +33,13 @@ async function sendPushNotification(tokensSnap, title, body, dataPayload = {}) {
 
   console.log(`✅ Enviadas: ${response.successCount}/${tokens.length}`);
 
+  // Log errores individuales para debugging
+  response.responses.forEach((resp, i) => {
+    if (!resp.success) {
+      console.error(`❌ Token ${i} falló:`, resp.error?.code, resp.error?.message);
+    }
+  });
+
   // Limpiar tokens inválidos
   const batch = db.batch();
   let cleaned = 0;

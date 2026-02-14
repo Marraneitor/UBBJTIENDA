@@ -1,46 +1,5 @@
-// UBBJ Tienda – Service Worker v6 (con Firebase Messaging)
-importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
-
-firebase.initializeApp({
-  apiKey: "AIzaSyCIggz9kowWV0aiq95GV-7KStBBdNry7NI",
-  authDomain: "ubbjtienda.firebaseapp.com",
-  projectId: "ubbjtienda",
-  storageBucket: "ubbjtienda.firebasestorage.app",
-  messagingSenderId: "156880129521",
-  appId: "1:156880129521:web:c245ca7018dd90d4454850"
-});
-
-const messaging = firebase.messaging();
-
-// FCM auto-muestra la notificación con el campo notification + fcmOptions.link
-// onBackgroundMessage solo para logging, NO crear notificación (evita duplicados)
-messaging.onBackgroundMessage((payload) => {
-  console.log('📨 Push recibido en background:', payload);
-});
-
-// Fallback: si FCM no maneja el click, este listener lo hace
-self.addEventListener("notificationclick", (event) => {
-  event.notification.close();
-  // FCM guarda data en notification.data.FCM_MSG.data
-  const fcmData = event.notification.data?.FCM_MSG?.data || event.notification.data || {};
-  const targetUrl = fcmData.url || "/";
-  event.waitUntil(
-    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
-      if (windowClients.length > 0) {
-        const client = windowClients[0];
-        client.navigate(targetUrl);
-        return client.focus();
-      }
-      return clients.openWindow(targetUrl);
-    })
-  );
-});
-
-// =============================================
-// 📦 CACHING
-// =============================================
-const CACHE_NAME = "ubbj-tienda-v6";
+// UBBJ Tienda – Service Worker v7 (solo caching, FCM en firebase-messaging-sw.js)
+const CACHE_NAME = "ubbj-tienda-v7";
 const PRECACHE_URLS = [
   "/",
   "/index.html",
