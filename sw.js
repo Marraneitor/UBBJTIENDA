@@ -1,5 +1,4 @@
-// UBBJ Tienda – Service Worker v5 (con Firebase Messaging)
-// ⚠️ importScripts DEBEN ir al inicio para que FCM funcione
+// UBBJ Tienda – Service Worker v6 (con Firebase Messaging)
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
 
@@ -14,28 +13,18 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// Notificación en segundo plano (data-only messages)
+// FCM auto-muestra la notificación con el campo notification + fcmOptions.link
+// onBackgroundMessage solo para logging, NO crear notificación (evita duplicados)
 messaging.onBackgroundMessage((payload) => {
-  console.log('📨 Notificación en segundo plano:', payload);
-  const title = payload.data?.title || '🔔 UBBJ Tienda';
-  const body = payload.data?.body || 'Tienes una actualización';
-  const url = payload.data?.url || '/';
-
-  self.registration.showNotification(title, {
-    body,
-    icon: '/Logoubbj.png',
-    badge: '/Logoubbj.png',
-    vibrate: [200, 100, 200, 100, 200],
-    tag: 'ubbj-notif-' + Date.now(),
-    renotify: true,
-    data: { url }
-  });
+  console.log('📨 Push recibido en background:', payload);
 });
 
-// Al hacer clic en la notificación, abrir la página correcta
+// Fallback: si FCM no maneja el click, este listener lo hace
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const targetUrl = event.notification.data?.url || "/";
+  // FCM guarda data en notification.data.FCM_MSG.data
+  const fcmData = event.notification.data?.FCM_MSG?.data || event.notification.data || {};
+  const targetUrl = fcmData.url || "/";
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
       if (windowClients.length > 0) {
@@ -51,7 +40,7 @@ self.addEventListener("notificationclick", (event) => {
 // =============================================
 // 📦 CACHING
 // =============================================
-const CACHE_NAME = "ubbj-tienda-v5";
+const CACHE_NAME = "ubbj-tienda-v6";
 const PRECACHE_URLS = [
   "/",
   "/index.html",

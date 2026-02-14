@@ -1,5 +1,4 @@
-// UBBJ Tienda – Firebase Messaging Service Worker (legacy fallback)
-// El SW principal es sw.js — este archivo solo existe por compatibilidad
+// UBBJ Tienda – Firebase Messaging Service Worker (fallback)
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
 
@@ -15,24 +14,13 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
-  const title = payload.data?.title || payload.notification?.title || '🔔 UBBJ Tienda';
-  const body = payload.data?.body || payload.notification?.body || 'Tienes una actualización';
-  const url = payload.data?.url || '/';
-
-  self.registration.showNotification(title, {
-    body,
-    icon: '/Logoubbj.png',
-    badge: '/Logoubbj.png',
-    vibrate: [200, 100, 200, 100, 200],
-    tag: 'ubbj-notif-' + Date.now(),
-    renotify: true,
-    data: { url }
-  });
+  console.log('📨 Push recibido (fallback SW):', payload);
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = event.notification.data?.url || '/';
+  const fcmData = event.notification.data?.FCM_MSG?.data || event.notification.data || {};
+  const targetUrl = fcmData.url || '/';
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
       if (clientList.length > 0) {

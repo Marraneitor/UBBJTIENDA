@@ -5,23 +5,28 @@ admin.initializeApp();
 const db = admin.firestore();
 
 // Helper para enviar notificaciones y limpiar tokens inválidos
-// Usa mensajes data-only para control total del display en el SW
 async function sendPushNotification(tokensSnap, title, body, dataPayload = {}) {
   const tokens = tokensSnap.docs.map(doc => doc.data().token).filter(Boolean);
   if (tokens.length === 0) return;
 
   console.log(`📨 Enviando notificación a ${tokens.length} dispositivo(s)`);
 
-  // Enviar como data-only (sin notification field) para que
-  // firebase-messaging-sw.js maneje todo y podamos controlar el click
+  const clickUrl = dataPayload.url || 'https://ubbjtienda.vercel.app/';
+
   const response = await admin.messaging().sendEachForMulticast({
-    data: {
-      title,
-      body,
-      ...dataPayload
-    },
+    notification: { title, body },
+    data: dataPayload,
     webpush: {
-      headers: { Urgency: 'high' }
+      headers: { Urgency: 'high' },
+      notification: {
+        icon: 'https://ubbjtienda.vercel.app/Logoubbj.png',
+        badge: 'https://ubbjtienda.vercel.app/Logoubbj.png',
+        vibrate: [200, 100, 200],
+        requireInteraction: true
+      },
+      fcmOptions: {
+        link: clickUrl
+      }
     },
     tokens
   });
