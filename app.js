@@ -68,7 +68,7 @@ async function requestNotificationPermission() {
   }
 
   try {
-    // Registrar firebase-messaging-sw.js explícitamente para FCM
+    // Usar el SW único que ya tiene Firebase Messaging
     const swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
     const messaging = getMessagingInstance();
     if (!messaging) return null;
@@ -3532,9 +3532,9 @@ window.addEventListener('appinstalled', () => {
 document.addEventListener("DOMContentLoaded", () => {
   trackVisit();
 
-  // ---- PWA: Registrar Service Worker ----
+  // ---- PWA: Registrar Service Worker único ----
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("./sw.js").catch((err) =>
+    navigator.serviceWorker.register("/firebase-messaging-sw.js").catch((err) =>
       console.warn("SW registro falló:", err)
     );
   }
