@@ -1,5 +1,57 @@
-// UBBJ Tienda – Service Worker v4 (con Firebase Messaging)
-const CACHE_NAME = "ubbj-tienda-v4";
+// UBBJ Tienda – Service Worker v5 (con Firebase Messaging)
+// ⚠️ importScripts DEBEN ir al inicio para que FCM funcione
+importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
+
+firebase.initializeApp({
+  apiKey: "AIzaSyCIggz9kowWV0aiq95GV-7KStBBdNry7NI",
+  authDomain: "ubbjtienda.firebaseapp.com",
+  projectId: "ubbjtienda",
+  storageBucket: "ubbjtienda.firebasestorage.app",
+  messagingSenderId: "156880129521",
+  appId: "1:156880129521:web:c245ca7018dd90d4454850"
+});
+
+const messaging = firebase.messaging();
+
+// Notificación en segundo plano (data-only messages)
+messaging.onBackgroundMessage((payload) => {
+  console.log('📨 Notificación en segundo plano:', payload);
+  const title = payload.data?.title || '🔔 UBBJ Tienda';
+  const body = payload.data?.body || 'Tienes una actualización';
+  const url = payload.data?.url || '/';
+
+  self.registration.showNotification(title, {
+    body,
+    icon: '/Logoubbj.png',
+    badge: '/Logoubbj.png',
+    vibrate: [200, 100, 200, 100, 200],
+    tag: 'ubbj-notif-' + Date.now(),
+    renotify: true,
+    data: { url }
+  });
+});
+
+// Al hacer clic en la notificación, abrir la página correcta
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || "/";
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+      if (windowClients.length > 0) {
+        const client = windowClients[0];
+        client.navigate(targetUrl);
+        return client.focus();
+      }
+      return clients.openWindow(targetUrl);
+    })
+  );
+});
+
+// =============================================
+// 📦 CACHING
+// =============================================
+const CACHE_NAME = "ubbj-tienda-v5";
 const PRECACHE_URLS = [
   "/",
   "/index.html",
@@ -106,56 +158,5 @@ self.addEventListener("fetch", (event) => {
           }
         });
       })
-  );
-});
-
-// =============================================
-// 🔔 Firebase Messaging (background push)
-// =============================================
-importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
-
-firebase.initializeApp({
-  apiKey: "AIzaSyCIggz9kowWV0aiq95GV-7KStBBdNry7NI",
-  authDomain: "ubbjtienda.firebaseapp.com",
-  projectId: "ubbjtienda",
-  storageBucket: "ubbjtienda.firebasestorage.app",
-  messagingSenderId: "156880129521",
-  appId: "1:156880129521:web:c245ca7018dd90d4454850"
-});
-
-const messaging = firebase.messaging();
-
-// Notificación en segundo plano (data-only messages)
-messaging.onBackgroundMessage((payload) => {
-  console.log('📨 Notificación en segundo plano:', payload);
-  const title = payload.data?.title || '🔔 UBBJ Tienda';
-  const body = payload.data?.body || 'Tienes una actualización';
-  const url = payload.data?.url || '/';
-
-  self.registration.showNotification(title, {
-    body,
-    icon: '/Logoubbj.png',
-    badge: '/Logoubbj.png',
-    vibrate: [200, 100, 200, 100, 200],
-    tag: 'ubbj-notif-' + Date.now(),
-    renotify: true,
-    data: { url }
-  });
-});
-
-// Al hacer clic en la notificación, abrir la página correcta
-self.addEventListener("notificationclick", (event) => {
-  event.notification.close();
-  const targetUrl = event.notification.data?.url || "/";
-  event.waitUntil(
-    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
-      if (windowClients.length > 0) {
-        const client = windowClients[0];
-        client.navigate(targetUrl);
-        return client.focus();
-      }
-      return clients.openWindow(targetUrl);
-    })
   );
 });
