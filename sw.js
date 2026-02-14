@@ -1,5 +1,5 @@
-// UBBJ Tienda – Service Worker v3 (optimizado)
-const CACHE_NAME = "ubbj-tienda-v3";
+// UBBJ Tienda – Service Worker v4 (con Firebase Messaging)
+const CACHE_NAME = "ubbj-tienda-v4";
 const PRECACHE_URLS = [
   "/",
   "/index.html",
@@ -109,44 +109,53 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
-// Push notifications
-self.addEventListener("push", (event) => {
-  if (!event.data) return;
-  try {
-    const data = event.data.json();
-    const title = data.notification?.title || "UBBJ Tienda";
-    const options = {
-      body: data.notification?.body || "Tienes una nueva notificación",
-      icon: "/icons/icon-192.png",
-      badge: "/icons/icon-192.png",
-      vibrate: [200, 100, 200],
-      data: data.data || {}
-    };
-    event.waitUntil(self.registration.showNotification(title, options));
-  } catch (e) {
-    console.warn("SW push parse error", e);
-  }
+// =============================================
+// 🔔 Firebase Messaging (background push)
+// =============================================
+importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
+
+firebase.initializeApp({
+  apiKey: "AIzaSyCIggz9kowWV0aiq95GV-7KStBBdNry7NI",
+  authDomain: "ubbjtienda.firebaseapp.com",
+  projectId: "ubbjtienda",
+  storageBucket: "ubbjtienda.firebasestorage.app",
+  messagingSenderId: "156880129521",
+  appId: "1:156880129521:web:c245ca7018dd90d4454850"
 });
 
+const messaging = firebase.messaging();
+
+// Notificación en segundo plano (data-only messages)
+messaging.onBackgroundMessage((payload) => {
+  console.log('📨 Notificación en segundo plano:', payload);
+  const title = payload.data?.title || '🔔 UBBJ Tienda';
+  const body = payload.data?.body || 'Tienes una actualización';
+  const url = payload.data?.url || '/';
+
+  self.registration.showNotification(title, {
+    body,
+    icon: '/Logoubbj.png',
+    badge: '/Logoubbj.png',
+    vibrate: [200, 100, 200, 100, 200],
+    tag: 'ubbj-notif-' + Date.now(),
+    renotify: true,
+    data: { url }
+  });
+});
+
+// Al hacer clic en la notificación, abrir la página correcta
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || event.notification.data?.FCM_MSG?.data?.url || "/";
+  const targetUrl = event.notification.data?.url || "/";
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
-      // Si ya hay una ventana abierta con esa URL, enfocarla
-      for (const client of windowClients) {
-        if (client.url.includes(url.replace('https://ubbjtienda.vercel.app', '')) && 'focus' in client) {
-          return client.focus();
-        }
-      }
-      // Si hay alguna ventana abierta, navegar a la URL
       if (windowClients.length > 0) {
         const client = windowClients[0];
-        client.navigate(url);
+        client.navigate(targetUrl);
         return client.focus();
       }
-      // Si no hay ventanas, abrir una nueva
-      return clients.openWindow(url);
+      return clients.openWindow(targetUrl);
     })
   );
 });

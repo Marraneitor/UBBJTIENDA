@@ -68,7 +68,8 @@ async function requestNotificationPermission() {
   }
 
   try {
-    const swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+    // Reutilizar el SW principal (sw.js) que ya incluye Firebase Messaging
+    const swReg = await navigator.serviceWorker.ready;
     const messaging = getMessagingInstance();
     if (!messaging) return null;
 
@@ -1083,7 +1084,7 @@ async function loadProfile() {
     setupProfileChat(sellerId, s);
 
     // Auto-abrir chat si viene de notificación
-    if (urlParams.get('openchat') === '1') {
+    if (params.get('openchat') === '1') {
       const fabBtn = document.getElementById('chat-fab-btn');
       if (fabBtn) setTimeout(() => fabBtn.click(), 500);
     }
