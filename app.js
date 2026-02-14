@@ -406,6 +406,132 @@ async function saveRating(buyerId, sellerId, stars) {
   }
 }
 
+// =============================================
+// 💬 SISTEMA DE RESEÑAS
+// =============================================
+const reviewsCol = db.collection("resenas");
+
+async function openReviewsModal(sellerId, sellerName) {
+  const modal = document.getElementById("reviews-modal");
+  const nameEl = document.getElementById("reviews-seller-name");
+  const listEl = document.getElementById("reviews-list");
+  const formContainer = document.getElementById("reviews-form-container");
+  if (!modal) return;
+
+  nameEl.textContent = sellerName;
+  listEl.innerHTML = '<p class="reviews-empty">Cargando reseñas...</p>';
+  formContainer.innerHTML = "";
+  modal.style.display = "flex";
+
+  // Cargar reseñas
+  try {
+    let snap;
+    try {
+      snap = await reviewsCol
+        .where("vendedorId", "==", sellerId)
+        .orderBy("fecha", "desc")
+        .get();
+    } catch (indexErr) {
+      // Si falta el índice compuesto, cargar sin orden
+      snap = await reviewsCol
+        .where("vendedorId", "==", sellerId)
+        .get();
+    }
+
+    if (snap.empty) {
+      listEl.innerHTML = '<p class="reviews-empty">Aún no hay reseñas. ¡Sé el primero en opinar!</p>';
+    } else {
+      listEl.innerHTML = "";
+      snap.forEach(doc => {
+        const r = doc.data();
+        const stars = "★".repeat(r.estrellas) + "☆".repeat(5 - r.estrellas);
+        const fecha = r.fecha ? r.fecha.toDate().toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" }) : "";
+        const initials = (r.nombreComprador || "?").split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+
+        listEl.innerHTML += `
+          <div class="review-card">
+            <div class="review-header">
+              <div class="review-avatar">${initials}</div>
+              <span class="review-author">${r.nombreComprador || "Anónimo"}</span>
+              <span class="review-date">${fecha}</span>
+            </div>
+            <div class="review-stars">${stars}</div>
+            ${r.comentario ? `<p class="review-comment">${r.comentario}</p>` : ''}
+          </div>`;
+      });
+    }
+  } catch (err) {
+    console.error("Error cargando reseñas:", err);
+    listEl.innerHTML = '<p class="reviews-empty">Error al cargar reseñas</p>';
+  }
+
+  // Formulario para dejar reseña (solo compradores logueados)
+  const buyerId = localStorage.getItem("buyer_id");
+  if (buyerId) {
+    let buyerName = "Comprador";
+    try {
+      const bDoc = await buyersCol.doc(buyerId).get();
+      if (bDoc.exists) buyerName = bDoc.data().nombre || "Comprador";
+    } catch (e) {}
+
+    let selectedStars = 0;
+
+    formContainer.innerHTML = `
+      <div class="review-form">
+        <h3>✍️ Deja tu reseña</h3>
+        <div class="stars-interactive" id="review-stars">
+          ${[1,2,3,4,5].map(i => `<span class="star-btn" data-value="${i}">★</span>`).join("")}
+        </div>
+        <textarea id="review-comment" placeholder="Escribe tu opinión sobre este vendedor..."></textarea>
+        <button class="btn-submit-review" id="submit-review-btn">Publicar reseña</button>
+      </div>`;
+
+    // Eventos estrellas
+    formContainer.querySelectorAll(".star-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        selectedStars = parseInt(btn.dataset.value);
+        formContainer.querySelectorAll(".star-btn").forEach(b => {
+          b.classList.toggle("filled", parseInt(b.dataset.value) <= selectedStars);
+        });
+      });
+    });
+
+    // Enviar reseña
+    document.getElementById("submit-review-btn").addEventListener("click", async () => {
+      if (selectedStars === 0) {
+        showToast("Selecciona una calificación", "error");
+        return;
+      }
+      const comment = document.getElementById("review-comment").value.trim();
+
+      try {
+        await reviewsCol.add({
+          compradorId: buyerId,
+          vendedorId: sellerId,
+          nombreComprador: buyerName,
+          estrellas: selectedStars,
+          comentario: comment,
+          fecha: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        showToast("¡Reseña publicada! 🎉", "success");
+        // Recargar modal
+        openReviewsModal(sellerId, sellerName);
+      } catch (err) {
+        console.error("Error guardando reseña:", err);
+        showToast("Error al guardar la reseña", "error");
+      }
+    });
+  } else {
+    formContainer.innerHTML = '<p class="review-login-hint">Inicia sesión en <a href="ubbjotito">Mi Ubbjotito</a> para dejar una reseña</p>';
+  }
+}
+
+// Cerrar modal al hacer clic fuera
+document.addEventListener("click", (e) => {
+  const modal = document.getElementById("reviews-modal");
+  if (modal && e.target === modal) modal.style.display = "none";
+});
+
 /** Sube imagen a Storage y devuelve la URL */
 async function uploadImage(file, folder) {
   const ext = file.name.split(".").pop();
@@ -539,10 +665,11 @@ function createSellerCard(id, s, productCount, ratingAvg = 0, ratingCount = 0) {
       ${s.turno ? `<p class="card-shift">${s.turno === 'matutino' ? '🌅 Matutino' : s.turno === 'vespertino' ? '🌇 Vespertino' : '🌄 Ambos turnos'}</p>` : ''}
       ${scheduleHtml}
       <p class="card-stats">${productCount} producto${productCount !== 1 ? 's' : ''}</p>
+      <button class="btn-reviews" data-seller-id="${id}" data-seller-name="${(s.nombre || '').replace(/"/g, '&quot;')}" onclick="event.stopPropagation(); openReviewsModal(this.dataset.sellerId, this.dataset.sellerName)">💬 Reseñas</button>
     </div>`;
 
   card.addEventListener("click", () => {
-    window.location.href = `perfil.html?id=${id}`;
+    window.location.href = `perfil?id=${id}`;
   });
 
   return card;
@@ -632,7 +759,7 @@ function buildRanking(sellersSnap, ratingsMap, productCount) {
         ${s.categoria ? `<span class="card-category-badge" style="font-size:0.65rem;padding:0.12rem 0.5rem">${s.categoria}</span>` : ''}
         <div class="ranking-stars">${renderStarsReadonly(item.avg, item.count)}</div>
       </div>`;
-    card.addEventListener("click", () => { window.location.href = `perfil.html?id=${item.id}`; });
+    card.addEventListener("click", () => { window.location.href = `perfil?id=${item.id}`; });
     grid.appendChild(card);
   });
 }
@@ -859,7 +986,7 @@ async function loadProfile() {
     const ratingContainer = document.getElementById("rating-container");
     if (ratingContainer) {
       const { avg, count } = await getSellerRating(sellerId);
-      const buyerId = sessionStorage.getItem("buyer_id");
+      const buyerId = localStorage.getItem("buyer_id");
 
       // Mostrar promedio
       ratingContainer.innerHTML = renderStarsReadonly(avg, count);
@@ -1125,7 +1252,7 @@ function setupCart(seller) {
       // Get buyer info for the message
       let buyerDisplayName = "";
       let buyerDisplayGroup = "";
-      const buyerId = sessionStorage.getItem("buyer_id");
+      const buyerId = localStorage.getItem("buyer_id");
       if (buyerId) {
         try {
           const bDoc = await buyersCol.doc(buyerId).get();
@@ -1221,7 +1348,7 @@ function setupVendorAuth() {
   if (!overlay) return;
 
   // Si ya hay sesión activa, cargar directamente
-  const savedVendor = sessionStorage.getItem("vendor_id");
+  const savedVendor = localStorage.getItem("vendor_id");
   if (savedVendor) {
     overlay.style.display = "none";
     loadVendorPanel(savedVendor);
@@ -1274,7 +1401,7 @@ function setupVendorAuth() {
         return;
       }
 
-      sessionStorage.setItem("vendor_id", foundDoc.id);
+      localStorage.setItem("vendor_id", foundDoc.id);
       overlay.style.display = "none";
       loadVendorPanel(foundDoc.id);
 
@@ -1303,7 +1430,7 @@ async function loadVendorPanel(sellerId) {
     const sellerDoc = await sellersCol.doc(sellerId).get();
     if (!sellerDoc.exists) {
       showToast("Vendedor no encontrado", "error");
-      sessionStorage.removeItem("vendor_id");
+      localStorage.removeItem("vendor_id");
       location.reload();
       return;
     }
@@ -1361,7 +1488,7 @@ async function loadVendorPanel(sellerId) {
     const logoutBtn = document.getElementById("vp-logout-btn");
     if (logoutBtn) {
       logoutBtn.addEventListener("click", () => {
-        sessionStorage.removeItem("vendor_id");
+        localStorage.removeItem("vendor_id");
         location.reload();
       });
     }
@@ -1474,7 +1601,7 @@ async function loadVendorPanel(sellerId) {
     const qrContainer = document.getElementById("profile-qr");
     const downloadBtn = document.getElementById("download-qr");
     if (qrContainer && typeof QRCode !== "undefined") {
-      const profileUrl = `${window.location.origin}/perfil.html?id=${sellerId}`;
+      const profileUrl = `${window.location.origin}/perfil?id=${sellerId}`;
       qrContainer.innerHTML = "";
       new QRCode(qrContainer, {
         text: profileUrl,
@@ -1607,7 +1734,7 @@ function setupEditProductForm() {
       showToast("¡Producto actualizado!", "success");
       modal.style.display = "none";
 
-      const vendorId = sessionStorage.getItem("vendor_id");
+      const vendorId = localStorage.getItem("vendor_id");
       if (vendorId) loadVendorPanel(vendorId);
     } catch (err) {
       console.error("Error actualizando producto:", err);
@@ -1627,7 +1754,7 @@ async function deleteProduct(productId) {
       { merge: true }
     );
     showToast("Producto eliminado", "success");
-    const vendorId = sessionStorage.getItem("vendor_id");
+    const vendorId = localStorage.getItem("vendor_id");
     if (vendorId) loadVendorPanel(vendorId);
   } catch (err) {
     console.error("Error eliminando producto:", err);
@@ -1641,7 +1768,7 @@ async function toggleProductVisibility(productId, hide) {
   try {
     await productsCol.doc(productId).update({ oculto: hide });
     showToast(hide ? "Producto oculto" : "Producto visible", "success");
-    const vendorId = sessionStorage.getItem("vendor_id");
+    const vendorId = localStorage.getItem("vendor_id");
     if (vendorId) loadVendorPanel(vendorId);
   } catch (err) {
     console.error("Error cambiando visibilidad:", err);
@@ -1961,7 +2088,7 @@ async function loadAdminData() {
               </div>
             </div>
             <div class="pending-actions">
-              <a href="perfil.html?id=${doc.id}" class="btn btn-primary btn-sm">👁 Ver perfil</a>
+              <a href="perfil?id=${doc.id}" class="btn btn-primary btn-sm">👁 Ver perfil</a>
               <button class="btn btn-warning btn-sm" onclick="openPasswordModal('${doc.id}', '${(s.password || '').replace(/'/g, "\\'")}')">🔑 Cambiar contraseña</button>
               <button class="btn btn-danger btn-sm" onclick="removeSeller('${doc.id}')">🗑 Eliminar</button>
             </div>`;
@@ -2163,7 +2290,7 @@ function setupBuyerAuth() {
   });
 
   // Si ya hay sesión activa
-  const savedBuyer = sessionStorage.getItem("buyer_id");
+  const savedBuyer = localStorage.getItem("buyer_id");
   if (savedBuyer) {
     overlay.style.display = "none";
     document.getElementById("buyer-profile-section").style.display = "block";
@@ -2210,7 +2337,7 @@ function setupBuyerAuth() {
         return;
       }
 
-      sessionStorage.setItem("buyer_id", foundDoc.id);
+      localStorage.setItem("buyer_id", foundDoc.id);
       overlay.style.display = "none";
       document.getElementById("buyer-profile-section").style.display = "block";
       loadBuyerProfile(foundDoc.id);
@@ -2291,7 +2418,7 @@ function setupBuyerAuth() {
         creadoEn: firebase.firestore.FieldValue.serverTimestamp()
       });
 
-      sessionStorage.setItem("buyer_id", docRef.id);
+      localStorage.setItem("buyer_id", docRef.id);
       overlay.style.display = "none";
       document.getElementById("buyer-profile-section").style.display = "block";
       loadBuyerProfile(docRef.id);
@@ -2325,7 +2452,7 @@ async function loadBuyerProfile(buyerId) {
     const doc = await buyersCol.doc(buyerId).get();
     if (!doc.exists) {
       showToast("Cuenta no encontrada", "error");
-      sessionStorage.removeItem("buyer_id");
+      localStorage.removeItem("buyer_id");
       location.reload();
       return;
     }
@@ -2393,7 +2520,7 @@ async function loadBuyerProfile(buyerId) {
     const logoutBtn = document.getElementById("buyer-logout-btn");
     if (logoutBtn) {
       logoutBtn.onclick = () => {
-        sessionStorage.removeItem("buyer_id");
+        localStorage.removeItem("buyer_id");
         location.reload();
       };
     }
@@ -2667,7 +2794,7 @@ function openBuyerConvPopup(buyerId, vendorId, vendorName) {
 
 /** Guardar una compra en el historial del comprador */
 async function savePurchase(seller, cartItems, totalPrice, paymentMethod) {
-  const buyerId = sessionStorage.getItem("buyer_id");
+  const buyerId = localStorage.getItem("buyer_id");
   if (!buyerId) return;
 
   try {
@@ -2842,7 +2969,7 @@ function setupProfileChat(sellerId, seller) {
   const msgContainer = document.getElementById('buyer-chat-messages');
   const input = document.getElementById('buyer-chat-input');
   const sendBtn = document.getElementById('buyer-chat-send');
-  const buyerId = sessionStorage.getItem('buyer_id');
+  const buyerId = localStorage.getItem('buyer_id');
 
   if (!fab || !buyerId) return;
 
@@ -3412,7 +3539,7 @@ document.addEventListener("DOMContentLoaded", () => {
         splash.classList.add("split-open");
         // Eliminar del DOM cuando la transición termine
         splash.querySelector(".splash-left").addEventListener("transitionend", () => splash.remove(), { once: true });
-      }, 2200);
+      }, 1200);
     }
   }
 

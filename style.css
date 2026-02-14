@@ -496,6 +496,28 @@ input, textarea, select { font-family: inherit; }
   font-weight: 600;
 }
 
+/* ---- Botón de Reseñas en tarjeta ---- */
+.btn-reviews {
+  margin-top: 0.5rem;
+  padding: 0.4rem 1rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: rgba(201, 168, 76, 0.12);
+  color: var(--primary);
+  border: 1.5px solid var(--primary);
+  border-radius: 20px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+}
+.btn-reviews:hover {
+  background: var(--primary);
+  color: #fff;
+  transform: scale(1.05);
+}
+.btn-reviews:active {
+  transform: scale(0.97);
+}
+
 .seller-card .card-desc {
   font-size: 0.78rem;
   color: var(--text-secondary);
@@ -2189,6 +2211,132 @@ input, textarea, select { font-family: inherit; }
   min-height: 80px;
 }
 
+/* ---------- Reviews Modal ---------- */
+.modal-reviews {
+  max-width: 520px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+.reviews-list {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 45vh;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding-right: 0.25rem;
+}
+.reviews-empty {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  padding: 2rem 0;
+}
+.review-card {
+  background: var(--bg, #faf8f4);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.review-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.review-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.review-author {
+  font-weight: 600;
+  font-size: 0.85rem;
+  flex: 1;
+}
+.review-date {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+.review-stars {
+  font-size: 0.8rem;
+  color: #f59e0b;
+}
+.review-comment {
+  font-size: 0.82rem;
+  color: var(--text);
+  line-height: 1.45;
+}
+.review-form {
+  border-top: 1px solid var(--border, #e2e8f0);
+  padding-top: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.review-form h3 {
+  font-size: 0.9rem;
+  margin: 0;
+}
+.review-form .stars-interactive {
+  font-size: 1.4rem;
+}
+.review-form textarea {
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  border: 1.5px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  background: var(--bg, #faf8f4);
+  color: var(--text);
+  resize: vertical;
+  min-height: 60px;
+}
+.review-form textarea:focus {
+  border-color: var(--primary);
+  outline: none;
+}
+.review-form .btn-submit-review {
+  align-self: flex-end;
+  padding: 0.5rem 1.25rem;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+}
+.review-form .btn-submit-review:hover {
+  background: #b8962f;
+  transform: scale(1.03);
+}
+.review-login-hint {
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border, #e2e8f0);
+}
+.review-login-hint a {
+  color: var(--primary);
+  font-weight: 600;
+}
+
 /* ---------- How It Works Steps ---------- */
 .how-steps {
   display: flex;
@@ -3081,6 +3229,19 @@ input, textarea, select { font-family: inherit; }
   color: rgba(255,255,255,0.3);
   text-align: center;
   margin: 0.3rem 0;
+}
+
+/* ---- Chat Popup: fix zoom en móvil ---- */
+@media (max-width: 600px) {
+  .chat-popup-input input {
+    font-size: 16px !important; /* Evita zoom automático en iOS */
+  }
+
+  .chat-popup-send {
+    width: 42px;
+    height: 42px;
+    font-size: 1.15rem;
+  }
 }
 
 /* ---- Vendor Chat Heads (Messenger-style floating circles) ---- */
